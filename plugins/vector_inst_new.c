@@ -1,3 +1,6 @@
+// TODO Implement getting the address for load and store since they use scalar registers 
+
+
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
