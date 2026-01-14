@@ -21,13 +21,13 @@
 #ifndef __DBM_H__
 #define __DBM_H__
 
-#include <stdbool.h>
-#include <signal.h>
+#include <inttypes.h>
+#include <libelf.h>
 #include <limits.h>
+#include <signal.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <sys/auxv.h>
-#include <libelf.h>
-#include <inttypes.h>
 #ifdef __arm__
 #include "pie/pie-arm-decoder.h"
 #include "pie/pie-thumb-decoder.h"
@@ -39,54 +39,51 @@
 /* Various parameters which can be tuned */
 
 // BASIC_BLOCK_SIZE should be a power of 2
-#define BASIC_BLOCK_SIZE 64
+#define BASIC_BLOCK_SIZE 128
 #ifdef DBM_TRACES
-  #define CODE_CACHE_SIZE 55000
+#define CODE_CACHE_SIZE 55000 / 2
 #else
-  #define CODE_CACHE_SIZE 65000
+#define CODE_CACHE_SIZE 65000 / 2
 #endif
 #define TRACE_FRAGMENT_NO 60000
 #define CODE_CACHE_OVERP 30
 #define TRACE_FRAGMENT_OVERP 50
-#define MAX_BRANCH_RANGE (16*1024*1024)
-#define TRACE_CACHE_SIZE (MAX_BRANCH_RANGE - (CODE_CACHE_SIZE*BASIC_BLOCK_SIZE * 4))
-#define TRACE_LIMIT_OFFSET (2*1024)
+#define MAX_BRANCH_RANGE (16 * 1024 * 1024)
+#define TRACE_CACHE_SIZE                                                       \
+  (MAX_BRANCH_RANGE - (CODE_CACHE_SIZE * BASIC_BLOCK_SIZE * 4))
+#define TRACE_LIMIT_OFFSET (2 * 1024)
 
 #define TRACE_ALIGN 4 // must be a power of 2
-#define TRACE_ALIGN_MASK (TRACE_ALIGN-1)
+#define TRACE_ALIGN_MASK (TRACE_ALIGN - 1)
 
 #define INST_CNT 400
 
-#define MAX_TB_INDEX  152
+#define MAX_TB_INDEX 152
 #define TB_CACHE_SIZE 32
 
 #define MAX_BACK_INLINE 5
 #define MAX_TRACE_FRAGMENTS 20
 
-#define RAS_SIZE (4096*5)
+#define RAS_SIZE (4096 * 5)
 #define TBB_TARGET_REACHED_SIZE 30
 
 #define MAX_CC_LINKS 100000
 
 // The size of the initial data segment allocation for brk emulation
 #ifdef __arm__
-  #define RESERVED_BRK_SPACE (PAGE_SIZE)
+#define RESERVED_BRK_SPACE (PAGE_SIZE)
 #else
-  #define RESERVED_BRK_SPACE (128*(PAGE_SIZE))
+#define RESERVED_BRK_SPACE (128 * (PAGE_SIZE))
 #endif
 
-#if defined __arm__ || __aarch64__ 
+#if defined __arm__ || __aarch64__
 #define THUMB 0x1
 #define FULLADDR 0x2
 #endif
 
 #define MAX_PLUGIN_NO (10)
 
-typedef enum {
-  mambo_bb = 0,
-  mambo_trace,
-  mambo_trace_entry
-} cc_type;
+typedef enum { mambo_bb = 0, mambo_trace, mambo_trace_entry } cc_type;
 
 typedef enum {
   unknown,
@@ -125,12 +122,12 @@ typedef enum {
   cbz_a64,
   tbz_a64,
   trace_exit
-#endif // __aarch64__
+#endif         // __aarch64__
 #ifdef __riscv // TODO: (riscv) decide on the names
-  jal_riscv,
+      jal_riscv,
   jalr_riscv,
   branch_riscv,
-  atomic_memory_riscv, //TODO maybe shouldn't have this here?
+  atomic_memory_riscv, // TODO maybe shouldn't have this here?
 #endif
 } branch_type;
 
@@ -140,7 +137,7 @@ typedef struct {
 
 typedef struct {
   dbm_block blocks[CODE_CACHE_SIZE];
-  uint8_t  traces[TRACE_CACHE_SIZE];
+  uint8_t traces[TRACE_CACHE_SIZE];
 } dbm_code_cache;
 
 #define FALLTHROUGH_LINKED (1 << 0)
@@ -215,7 +212,7 @@ struct riscv_imm_pair {
 typedef struct riscv_imm_pair riscv_imm_pair_t;
 #endif
 
-#define MAX_TRACE_REC_EXITS (MAX_TRACE_FRAGMENTS+1)
+#define MAX_TRACE_REC_EXITS (MAX_TRACE_FRAGMENTS + 1)
 typedef struct {
   int id;
   int source_bb;
@@ -226,11 +223,7 @@ typedef struct {
   struct trace_exits exits[MAX_TRACE_REC_EXITS];
 } trace_in_prog;
 
-enum dbm_thread_status {
-  THREAD_RUNNING = 0,
-  THREAD_SYSCALL,
-  THREAD_EXIT
-};
+enum dbm_thread_status { THREAD_RUNNING = 0, THREAD_SYSCALL, THREAD_EXIT };
 
 typedef struct dbm_thread_s dbm_thread;
 struct dbm_thread_s {
@@ -249,11 +242,11 @@ struct dbm_thread_s {
   dbm_code_cache_meta code_cache_meta[CODE_CACHE_SIZE + TRACE_FRAGMENT_NO];
   hash_table entry_address;
 #ifdef DBM_TRACES
-  uint8_t   exec_count[CODE_CACHE_SIZE];
+  uint8_t exec_count[CODE_CACHE_SIZE];
   uintptr_t trace_head_incr_addr;
-  uint8_t  *trace_cache_next;
-  int       trace_id;
-  int       trace_fragment_count;
+  uint8_t *trace_cache_next;
+  int trace_id;
+  int trace_fragment_count;
   trace_in_prog active_trace;
 #endif
 
@@ -286,11 +279,7 @@ typedef enum {
   RISCV_INST,
 } inst_set;
 
-typedef enum {
-  VM_MAP,
-  VM_UNMAP,
-  VM_PROT
-} vm_op_t;
+typedef enum { VM_MAP, VM_UNMAP, VM_PROT } vm_op_t;
 
 #include "api/plugin_support.h"
 
@@ -311,7 +300,7 @@ typedef struct {
 typedef struct {
   int func_count;
   pthread_mutex_t funcs_lock;
-  watched_func_t  funcs[MAX_WATCHED_FUNCS];
+  watched_func_t funcs[MAX_WATCHED_FUNCS];
 
   int funcp_count;
   pthread_mutex_t funcps_lock;
@@ -353,8 +342,8 @@ void thread_abort(dbm_thread *thread_data);
 extern void dispatcher_trampoline();
 extern void syscall_wrapper();
 extern void trace_head_incr();
-extern void* start_of_dispatcher_s;
-extern void* end_of_dispatcher_s;
+extern void *start_of_dispatcher_s;
+extern void *end_of_dispatcher_s;
 extern void th_to_arm();
 #ifdef __riscv
 extern void th_enter(void *stack, uintptr_t cc_addr, uintptr_t tls);
@@ -374,41 +363,54 @@ void init_thread(dbm_thread *thread_data);
 void reset_process(dbm_thread *thread_data);
 
 uintptr_t cc_lookup(dbm_thread *thread_data, uintptr_t target);
-uintptr_t lookup_or_scan(dbm_thread * const thread_data, uintptr_t target);
-uintptr_t lookup_or_scan_with_cached(dbm_thread * const thread_data,
+uintptr_t lookup_or_scan(dbm_thread *const thread_data, uintptr_t target);
+uintptr_t lookup_or_scan_with_cached(dbm_thread *const thread_data,
                                      const uintptr_t target,
-                                     bool * const cached);
+                                     bool *const cached);
 uintptr_t lookup_or_stub(dbm_thread *thread_data, uintptr_t target);
 uintptr_t scan(dbm_thread *thread_data, uint16_t *address, int basic_block);
-uint32_t scan_a32(dbm_thread *thread_data, uint32_t *read_address, int basic_block, cc_type type, uint32_t *write_p);
-uint32_t scan_t32(dbm_thread *thread_data, uint16_t *read_address, int basic_block, cc_type type, uint16_t *write_p);
-size_t   scan_a64(dbm_thread *thread_data, uint32_t *read_address, int basic_block, cc_type type, uint32_t *write_p);
-size_t   scan_riscv(dbm_thread *thread_data, uint16_t *read_address, int basic_block, cc_type type, uint16_t *write_p);
+uint32_t scan_a32(dbm_thread *thread_data, uint32_t *read_address,
+                  int basic_block, cc_type type, uint32_t *write_p);
+uint32_t scan_t32(dbm_thread *thread_data, uint16_t *read_address,
+                  int basic_block, cc_type type, uint16_t *write_p);
+size_t scan_a64(dbm_thread *thread_data, uint32_t *read_address,
+                int basic_block, cc_type type, uint32_t *write_p);
+size_t scan_riscv(dbm_thread *thread_data, uint16_t *read_address,
+                  int basic_block, cc_type type, uint16_t *write_p);
 int allocate_bb(dbm_thread *thread_data);
-void trace_dispatcher(uintptr_t target, uintptr_t *next_addr, uint32_t source_index, dbm_thread *thread_data);
+void trace_dispatcher(uintptr_t target, uintptr_t *next_addr,
+                      uint32_t source_index, dbm_thread *thread_data);
 void flush_code_cache(dbm_thread *thread_data);
-void insert_cond_exit_branch(dbm_code_cache_meta *bb_meta, void **o_write_p, int cond);
-void sigret_dispatcher_call(dbm_thread *thread_data, ucontext_t *cont, uintptr_t target);
+void insert_cond_exit_branch(dbm_code_cache_meta *bb_meta, void **o_write_p,
+                             int cond);
+void sigret_dispatcher_call(dbm_thread *thread_data, ucontext_t *cont,
+                            uintptr_t target);
 
-void thumb_encode_stub_bb(dbm_thread *thread_data, int basic_block, uint32_t target);
-void arm_encode_stub_bb(dbm_thread *thread_data, int basic_block, uint32_t target);
+void thumb_encode_stub_bb(dbm_thread *thread_data, int basic_block,
+                          uint32_t target);
+void arm_encode_stub_bb(dbm_thread *thread_data, int basic_block,
+                        uint32_t target);
 
-int addr_to_bb_id(dbm_thread * const thread_data, const uintptr_t addr);
-int addr_to_fragment_id(dbm_thread * const thread_data, const uintptr_t addr);
-void record_cc_link(dbm_thread *thread_data, uintptr_t linked_from, uintptr_t linked_to_addr);
-bool is_bb(dbm_thread * const thread_data, const uintptr_t addr);
-bool is_trace(dbm_thread * const thread_data, const uintptr_t addr);
+int addr_to_bb_id(dbm_thread *const thread_data, const uintptr_t addr);
+int addr_to_fragment_id(dbm_thread *const thread_data, const uintptr_t addr);
+void record_cc_link(dbm_thread *thread_data, uintptr_t linked_from,
+                    uintptr_t linked_to_addr);
+bool is_bb(dbm_thread *const thread_data, const uintptr_t addr);
+bool is_trace(dbm_thread *const thread_data, const uintptr_t addr);
 
 void install_system_sig_handlers();
 
 #define MAP_INTERP (0x40000000)
 #define MAP_APP (0x20000000)
-void notify_vm_op(vm_op_t op, uintptr_t addr, size_t size, int prot, int flags, int fd, off_t off);
+void notify_vm_op(vm_op_t op, uintptr_t addr, size_t size, int prot, int flags,
+                  int fd, off_t off);
 
 #ifdef __arm__
-void thumb_simple_exit(dbm_thread *thread_data, uint16_t **o_write_p, int bb_index, uint32_t target);
-void arm_simple_exit(dbm_thread *thread_data, uint32_t **o_write_p, int bb_index,
-                     uint32_t offset, uint32_t *read_address, uint32_t cond);
+void thumb_simple_exit(dbm_thread *thread_data, uint16_t **o_write_p,
+                       int bb_index, uint32_t target);
+void arm_simple_exit(dbm_thread *thread_data, uint32_t **o_write_p,
+                     int bb_index, uint32_t offset, uint32_t *read_address,
+                     uint32_t cond);
 #endif
 
 inline static uintptr_t adjust_cc_entry(uintptr_t addr) {
@@ -428,22 +430,30 @@ extern __thread dbm_thread *current_thread;
 
 /* API-related functions */
 #ifdef PLUGINS_NEW
-void set_mambo_context(mambo_context *ctx, dbm_thread *thread_data, mambo_cb_idx event_type);
-void set_mambo_context_code(mambo_context *ctx, dbm_thread *thread_data, mambo_cb_idx event_type,
-                            cc_type fragment_type, int fragment_id, inst_set inst_type, int inst,
-                            mambo_cond cond, void *read_address, void *write_p, void *data_p, bool *stop);
-void set_mambo_context_syscall(mambo_context *ctx, dbm_thread *thread_data, mambo_cb_idx event_type,
-                               uintptr_t number, uintptr_t *regs);
+void set_mambo_context(mambo_context *ctx, dbm_thread *thread_data,
+                       mambo_cb_idx event_type);
+void set_mambo_context_code(mambo_context *ctx, dbm_thread *thread_data,
+                            mambo_cb_idx event_type, cc_type fragment_type,
+                            int fragment_id, inst_set inst_type, int inst,
+                            mambo_cond cond, void *read_address, void *write_p,
+                            void *data_p, bool *stop);
+void set_mambo_context_syscall(mambo_context *ctx, dbm_thread *thread_data,
+                               mambo_cb_idx event_type, uintptr_t number,
+                               uintptr_t *regs);
 #endif
 void mambo_deliver_callbacks_for_ctx(mambo_context *ctx);
 void mambo_deliver_callbacks(unsigned cb_id, dbm_thread *thread_data);
-void mambo_deliver_callbacks_code(unsigned cb_id, dbm_thread *thread_data, cc_type fragment_type,
-                                  int fragment_id, inst_set inst_type, int inst, mambo_cond cond,
-                                  void *read_address, void *write_p, void *data_p, bool *stop);
+void mambo_deliver_callbacks_code(unsigned cb_id, dbm_thread *thread_data,
+                                  cc_type fragment_type, int fragment_id,
+                                  inst_set inst_type, int inst, mambo_cond cond,
+                                  void *read_address, void *write_p,
+                                  void *data_p, bool *stop);
 void _function_callback_wrapper(mambo_context *ctx, watched_func_t *func);
-int function_watch_parse_elf(watched_functions_t *self, Elf *elf, void *base_addr);
+int function_watch_parse_elf(watched_functions_t *self, Elf *elf,
+                             void *base_addr);
 int function_watch_add(watched_functions_t *self, char *name, int plugin_id,
-                       mambo_callback pre_callback, mambo_callback post_callback);
+                       mambo_callback pre_callback,
+                       mambo_callback post_callback);
 
 #define min(a, b) (((a) < (b)) ? (a) : (b))
 #define max(a, b) (((a) > (b)) ? (a) : (b))
@@ -453,45 +463,48 @@ int function_watch_add(watched_functions_t *self, char *name, int plugin_id,
 #define ALLOCATE_BB 0
 
 #ifdef CC_HUGETLB
-  #define CC_PAGE_SIZE (2*1024*1024)
-  #define CC_MMAP_OPTS (MAP_PRIVATE|MAP_ANONYMOUS|MAP_HUGETLB)
+#define CC_PAGE_SIZE (2 * 1024 * 1024)
+#define CC_MMAP_OPTS (MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB)
 #else
-  #define CC_PAGE_SIZE (page_size)
-  #define CC_MMAP_OPTS (MAP_PRIVATE|MAP_ANONYMOUS)
+#define CC_PAGE_SIZE (page_size)
+#define CC_MMAP_OPTS (MAP_PRIVATE | MAP_ANONYMOUS)
 #endif
 
 #ifdef METADATA_HUGETLB
-  #define METADATA_PAGE_SIZE (2*1024*1024)
-  #define METADATA_MMAP_OPTS (MAP_PRIVATE|MAP_ANONYMOUS|MAP_HUGETLB)
+#define METADATA_PAGE_SIZE (2 * 1024 * 1024)
+#define METADATA_MMAP_OPTS (MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB)
 #else
-  #define METADATA_PAGE_SIZE (page_size)
-  #define METADATA_MMAP_OPTS (MAP_PRIVATE|MAP_ANONYMOUS)
+#define METADATA_PAGE_SIZE (page_size)
+#define METADATA_MMAP_OPTS (MAP_PRIVATE | MAP_ANONYMOUS)
 #endif
 
-#define ROUND_UP(input, multiple_of) \
-  ((((input) / (multiple_of)) * (multiple_of)) + (((input) % (multiple_of)) ? (multiple_of) : 0))
+#define ROUND_UP(input, multiple_of)                                           \
+  ((((input) / (multiple_of)) * (multiple_of)) +                               \
+   (((input) % (multiple_of)) ? (multiple_of) : 0))
 
 #define CC_SZ_ROUND(input) ROUND_UP(input, CC_PAGE_SIZE)
 #define METADATA_SZ_ROUND(input) ROUND_UP(input, CC_PAGE_SIZE)
 
-#define PAGE_SIZE (page_size != 0 ? page_size : (page_size = getauxval(AT_PAGESZ)))
+#define PAGE_SIZE                                                              \
+  (page_size != 0 ? page_size : (page_size = getauxval(AT_PAGESZ)))
 
-#define trampolines_size_bytes         ((uintptr_t)&end_of_dispatcher_s - (uintptr_t)&start_of_dispatcher_s)
-#define trampolines_size_bbs           ((trampolines_size_bytes / sizeof(dbm_block)) \
-                                      + ((trampolines_size_bytes % sizeof(dbm_block)) ? 1 : 0))
+#define trampolines_size_bytes                                                 \
+  ((uintptr_t)&end_of_dispatcher_s - (uintptr_t)&start_of_dispatcher_s)
+#define trampolines_size_bbs                                                   \
+  ((trampolines_size_bytes / sizeof(dbm_block)) +                              \
+   ((trampolines_size_bytes % sizeof(dbm_block)) ? 1 : 0))
 
 #define UNLINK_SIGNAL (SIGILL)
 #define CPSR_T (0x20)
 
 #ifdef __arm__
-  #define context_pc uc_mcontext.arm_pc
-  #define context_sp uc_mcontext.arm_sp
-  #define context_reg(reg) uc_mcontext.arm_r##reg
+#define context_pc uc_mcontext.arm_pc
+#define context_sp uc_mcontext.arm_sp
+#define context_reg(reg) uc_mcontext.arm_r##reg
 #elif __aarch64__
-  #define context_pc uc_mcontext.pc
-  #define context_sp uc_mcontext.sp
-  #define context_reg(reg) uc_mcontext.regs[reg]
+#define context_pc uc_mcontext.pc
+#define context_sp uc_mcontext.sp
+#define context_reg(reg) uc_mcontext.regs[reg]
 #endif
 
 #endif
-

@@ -5,3 +5,6 @@ elf/elf_loader.o
 elf/symbol_parser.o
 .vscode/
 output.txt
+vector_trace.json
+vreg_dump.txt
+/temp

@@ -13,7 +13,8 @@
 #PLUGINS+=plugins/datarace/datarace.c plugins/datarace/detectors/fasttrack.c
 #PLUGINS+=plugins/datarace/datarace.c plugins/datarace/detectors/djit.c
 #PLUGINS+=plugins/vector_counter.c
-PLUGINS+=plugins/vector_tracer.c
+#PLUGINS+=plugins/vector_tracer.c
+PLUGINS+=plugins/vector_tracer_optimized.c
 
 OPTS= -DDBM_LINK_UNCOND_IMM
 OPTS+=-DDBM_INLINE_UNCOND_IMM
