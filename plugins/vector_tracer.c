@@ -1,6 +1,3 @@
-// TODO Implement getting the address for load and store since they use scalar registers 
-
-
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
@@ -80,9 +77,9 @@ static uint8_t g_saved_rvv[RVV_SAVE_BYTES];
 #define OFF_CSR_VSTART   32
 #define OFF_CSR_VCSR     40
 #define OFF_CSR_VLENB    48
-#define OFF_CSR_RD       56  // rd scalar register value (64-bit) - contains VL
-#define OFF_CSR_RS1      64  // rs1 scalar register value (64-bit) - contains AVL
-#define OFF_CSR_RS2      72  // rs2 scalar register value (64-bit) - contains VTYPE (for vsetvl)
+#define OFF_CSR_RD       56  // rd scalar register value - contains VL
+#define OFF_CSR_RS1      64  // rs1 scalar register value - contains AVL
+#define OFF_CSR_RS2      72  // rs2 scalar register value - contains VTYPE
 #define OFF_CSR_VREGS    80  // Vector registers start
 
 
