@@ -544,6 +544,10 @@ static int vector_post_inst_cb(mambo_context *ctx) {
     emit_riscv_sd_off(ctx, reg1, reg0, 0);
     emit_riscv_addi(ctx, X_SP, X_SP, 8);
     
+    //TODO new idea. Have a new variable called number_entries inside the buffer and increment it each time. 
+    // if the number is greater then INST_REG_MAX_ENTRIES, flush the buffer and reset the number to 0
+    // Then we cna use vtype_preserve function to call the printing function so this block executes 
+    // each time and printing is only done inside the vtype_preserve function.
 
     //TODO This is the part that I think is broken and produces Illigal instruction error
     // Check if buffer is full and flush if needed
