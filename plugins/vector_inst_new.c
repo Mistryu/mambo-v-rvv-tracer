@@ -40,16 +40,18 @@
 #define RVV_VREG_SAVE_BYTES (RVV_NUM_VREGS * RVV_VREG_BYTES)  // 8192 bytes
 #define RVV_HDR_BYTES       64u        // Header space for alignment (PC + CSRs)
 #define RVV_LS_HDR_BYTES    64u        // Header space for load/store (includes rs1)
-#define RVV_SAVE_BYTES      (RVV_LS_HDR_BYTES + RVV_VREG_SAVE_BYTES)  // 8256 bytes total
+#define RVV_CSR_HDR_BYTES   80u        // Header space for CSR (includes rd, rs1, rs2)
+#define RVV_SAVE_BYTES      (RVV_CSR_HDR_BYTES + RVV_VREG_SAVE_BYTES)  // 8272 bytes total
 
 __attribute__((aligned(64)))
 static uint8_t g_saved_rvv[RVV_SAVE_BYTES];
 
-// I am going to reuse the smae buffer for different instructions 
-#define RVV_TYPE_REG_REG_CSR  1u  // Register-register or CSR 
-#define RVV_TYPE_LOAD_STORE   2u  // Load/store 
+// Buffer type identifiers
+#define RVV_TYPE_REG_REG    1u  // Register-register
+#define RVV_TYPE_CSR         2u  // CSR instructions
+#define RVV_TYPE_LOAD_STORE  3u  // Load/store 
 
-// Buffer offsets - Type 1 Register-register/CSR
+// Buffer offsets - Type 1 Register-register
 #define OFF_TYPE     0
 #define OFF_PC       8
 #define OFF_VL       16
@@ -69,6 +71,19 @@ static uint8_t g_saved_rvv[RVV_SAVE_BYTES];
 #define OFF_LS_VLENB    48
 #define OFF_LS_RS1      56  // rs1 scalar register value (64-bit)
 #define OFF_LS_VREGS    64  // Vector registers start
+
+// Buffer offsets - Type 3 CSR
+#define OFF_CSR_TYPE     0
+#define OFF_CSR_PC       8
+#define OFF_CSR_VL       16
+#define OFF_CSR_VTYPE    24
+#define OFF_CSR_VSTART   32
+#define OFF_CSR_VCSR     40
+#define OFF_CSR_VLENB    48
+#define OFF_CSR_RD       56  // rd scalar register value (64-bit) - contains VL
+#define OFF_CSR_RS1      64  // rs1 scalar register value (64-bit) - contains AVL
+#define OFF_CSR_RS2      72  // rs2 scalar register value (64-bit) - contains VTYPE (for vsetvl)
+#define OFF_CSR_VREGS    80  // Vector registers start
 
 
 void emit_riscv_v_store_1(mambo_context *ctx,
@@ -254,7 +269,17 @@ static inline void emit_rvv_print_vtype_preserve(mambo_context *ctx,
     uint8_t buffer_type;
     int pc_offset, vl_offset, vtype_offset, vstart_offset, vcsr_offset, vlenb_offset, vregs_offset;
     
-    if (inst_type == 3) { // Load/store
+    // Order: reg-reg (most common), load/store, CSR (least common)
+    if (inst_type == 1) { // Register-register (most common)
+        buffer_type = RVV_TYPE_REG_REG;
+        pc_offset = OFF_PC;
+        vl_offset = OFF_VL;
+        vtype_offset = OFF_VTYPE;
+        vstart_offset = OFF_VSTART;
+        vcsr_offset = OFF_VCSR;
+        vlenb_offset = OFF_VLENB;
+        vregs_offset = OFF_VREGS;
+    } else if (inst_type == 3) { // Load/store (second most common)
         buffer_type = RVV_TYPE_LOAD_STORE;
         pc_offset = OFF_LS_PC;
         vl_offset = OFF_LS_VL;
@@ -263,15 +288,15 @@ static inline void emit_rvv_print_vtype_preserve(mambo_context *ctx,
         vcsr_offset = OFF_LS_VCSR;
         vlenb_offset = OFF_LS_VLENB;
         vregs_offset = OFF_LS_VREGS;
-    } else {         // Register-register or CSR
-        buffer_type = RVV_TYPE_REG_REG_CSR;
-        pc_offset = OFF_PC;
-        vl_offset = OFF_VL;
-        vtype_offset = OFF_VTYPE;
-        vstart_offset = OFF_VSTART;
-        vcsr_offset = OFF_VCSR;
-        vlenb_offset = OFF_VLENB;
-        vregs_offset = OFF_VREGS;
+    } else { // CSR (least common, inst_type == 2)
+        buffer_type = RVV_TYPE_CSR;
+        pc_offset = OFF_CSR_PC;
+        vl_offset = OFF_CSR_VL;
+        vtype_offset = OFF_CSR_VTYPE;
+        vstart_offset = OFF_CSR_VSTART;
+        vcsr_offset = OFF_CSR_VCSR;
+        vlenb_offset = OFF_CSR_VLENB;
+        vregs_offset = OFF_CSR_VREGS;
     }
 
     // Push mask to stack
@@ -286,9 +311,9 @@ static inline void emit_rvv_print_vtype_preserve(mambo_context *ctx,
     emit_riscv_sd_off(ctx, X_T5, X_SP, 0);
     emit_riscv_sd_off(ctx, X_T6, X_SP, 8);
 
-    // Write type byte to buffer
+    // Write type byte to buffer (all types store type at offset 0)
     emit_set_reg(ctx, X_T5, buffer_type);
-    emit_riscv_sd_off(ctx, X_T5, X_A0, OFF_TYPE);
+    emit_riscv_sd_off(ctx, X_T5, X_A0, 0);
 
     // Save PC to buffer
     emit_set_reg(ctx, X_T5, pc);
@@ -306,9 +331,26 @@ static inline void emit_rvv_print_vtype_preserve(mambo_context *ctx,
     if (inst_type == 3) {
         uint8_t rs1_num = (insn >> 15) & 0x1F;
         
-        // Read rs1 value from scalar register and save to buffer
+        // Read rs1 
         emit_mov(ctx, X_T5, (enum reg)rs1_num);
         emit_riscv_sd_off(ctx, X_T5, X_A0, OFF_LS_RS1);
+
+    } else if (inst_type == 2) { // For CSR instructions, saving rd, rs1, and rs2 values
+        uint8_t rd_num = (insn >> 7) & 0x1F;
+        uint8_t rs1_num = (insn >> 15) & 0x1F;
+        uint8_t rs2_num = (insn >> 20) & 0x1F;
+        
+        // Read rd
+        emit_mov(ctx, X_T5, (enum reg)rd_num);
+        emit_riscv_sd_off(ctx, X_T5, X_A0, OFF_CSR_RD);
+        
+        // Read rs1
+        emit_mov(ctx, X_T5, (enum reg)rs1_num);
+        emit_riscv_sd_off(ctx, X_T5, X_A0, OFF_CSR_RS1);
+        
+        // Read rs2
+        emit_mov(ctx, X_T5, (enum reg)rs2_num);
+        emit_riscv_sd_off(ctx, X_T5, X_A0, OFF_CSR_RS2);
     }
 
     // Save vector registers to buffer
@@ -411,22 +453,26 @@ static void rvv_print_to_json(uint32_t insn, uintptr_t pc) {
         }
     }
     
-    uint8_t buffer_type = g_saved_rvv[OFF_TYPE];
+    // Read buffer type from offset 0 (all types store type at offset 0)
+    uint8_t buffer_type = g_saved_rvv[0];
     
     int vlenb_offset, vregs_offset;
-    if (buffer_type == RVV_TYPE_LOAD_STORE) {
-        vlenb_offset = OFF_LS_VLENB;
-        vregs_offset = OFF_LS_VREGS;
-    } else {
+    // Order: reg-reg (most common), load/store, CSR (least common)
+    if (buffer_type == RVV_TYPE_REG_REG) {
         vlenb_offset = OFF_VLENB;
         vregs_offset = OFF_VREGS;
+    } else if (buffer_type == RVV_TYPE_LOAD_STORE) {
+        vlenb_offset = OFF_LS_VLENB;
+        vregs_offset = OFF_LS_VREGS;
+    } else { // CSR (least common)
+        vlenb_offset = OFF_CSR_VLENB;
+        vregs_offset = OFF_CSR_VREGS;
     }
     
     uint64_t vlenb = *(const uint64_t *)(g_saved_rvv + vlenb_offset);
     
     // Validate vlenb
     if (vlenb == 0 || vlenb > RVV_VREG_BYTES) {
-        // Fallback to max size if vlenb is invalid
         vlenb = RVV_VREG_BYTES;
     }
     
@@ -464,7 +510,15 @@ static void rvv_print_to_json(uint32_t insn, uintptr_t pc) {
     fprintf(json_fp, "    \"instruction\": \"0x%08" PRIx32 "\",\n", insn);
     fprintf(json_fp, "    \"type\": %u,\n", buffer_type);
     
-    if (buffer_type == RVV_TYPE_LOAD_STORE) {
+    if (buffer_type == RVV_TYPE_REG_REG) {
+        fprintf(json_fp, "    \"vd\": %u,\n", vd);
+        fprintf(json_fp, "    \"vs1\": %u,\n", vs1);
+        fprintf(json_fp, "    \"vs2\": %u,\n", vs2);
+        fprintf(json_fp, "    \"vd_data\": \"%s\",\n", vd_hex);
+        fprintf(json_fp, "    \"vs1_data\": \"%s\",\n", vs1_hex);
+        fprintf(json_fp, "    \"vs2_data\": \"%s\"\n", vs2_hex);
+
+    } else if (buffer_type == RVV_TYPE_LOAD_STORE) {
         uint64_t rs1_value = *(const uint64_t *)(g_saved_rvv + OFF_LS_RS1);
         fprintf(json_fp, "    \"vd\": %u,\n", vd);
         fprintf(json_fp, "    \"rs1\": %u,\n", vs1);
@@ -472,13 +526,28 @@ static void rvv_print_to_json(uint32_t insn, uintptr_t pc) {
         fprintf(json_fp, "    \"vs2\": %u,\n", vs2);
         fprintf(json_fp, "    \"vd_data\": \"%s\",\n", vd_hex);
         fprintf(json_fp, "    \"vs2_data\": \"%s\"\n", vs2_hex);
+
     } else {
-        fprintf(json_fp, "    \"vd\": %u,\n", vd);
-        fprintf(json_fp, "    \"vs1\": %u,\n", vs1);
-        fprintf(json_fp, "    \"vs2\": %u,\n", vs2);
-        fprintf(json_fp, "    \"vd_data\": \"%s\",\n", vd_hex);
-        fprintf(json_fp, "    \"vs1_data\": \"%s\",\n", vs1_hex);
-        fprintf(json_fp, "    \"vs2_data\": \"%s\"\n", vs2_hex);
+        uint64_t vl = *(const uint64_t *)(g_saved_rvv + OFF_CSR_VL);
+        uint64_t vtype = *(const uint64_t *)(g_saved_rvv + OFF_CSR_VTYPE);
+        uint64_t vstart = *(const uint64_t *)(g_saved_rvv + OFF_CSR_VSTART);
+        uint64_t vcsr = *(const uint64_t *)(g_saved_rvv + OFF_CSR_VCSR);
+        uint64_t vlenb = *(const uint64_t *)(g_saved_rvv + OFF_CSR_VLENB);
+        uint64_t rd_value = *(const uint64_t *)(g_saved_rvv + OFF_CSR_RD);
+        uint64_t rs1_value = *(const uint64_t *)(g_saved_rvv + OFF_CSR_RS1);
+        uint64_t rs2_value = *(const uint64_t *)(g_saved_rvv + OFF_CSR_RS2);
+        
+        fprintf(json_fp, "    \"rd\": %u,\n", vd);  // rd is in vd field
+        fprintf(json_fp, "    \"rd_value\": \"0x%016" PRIx64 "\",\n", rd_value);
+        fprintf(json_fp, "    \"rs1\": %u,\n", vs1);  // rs1 is in vs1 field
+        fprintf(json_fp, "    \"rs1_value\": \"0x%016" PRIx64 "\",\n", rs1_value);
+        fprintf(json_fp, "    \"rs2\": %u,\n", vs2);  // rs2 is in vs2 field
+        fprintf(json_fp, "    \"rs2_value\": \"0x%016" PRIx64 "\",\n", rs2_value);
+        fprintf(json_fp, "    \"vl\": \"0x%016" PRIx64 "\",\n", vl);
+        fprintf(json_fp, "    \"vtype\": \"0x%016" PRIx64 "\",\n", vtype);
+        fprintf(json_fp, "    \"vstart\": \"0x%016" PRIx64 "\",\n", vstart);
+        fprintf(json_fp, "    \"vcsr\": \"0x%016" PRIx64 "\",\n", vcsr);
+        fprintf(json_fp, "    \"vlenb\": \"0x%016" PRIx64 "\"\n", vlenb);
     }
     
     fprintf(json_fp, "  }");
@@ -498,22 +567,7 @@ static int vector_post_inst_cb(mambo_context *ctx) {
 
     uintptr_t pc = (uintptr_t)ctx->code.read_address;
 
-    switch (inst_type) {
-    case 1:  // Register-register
-        emit_rvv_print_vtype_preserve(ctx, reg2, reg3, insn, pc, 1);
-        break;
-    
-    case 2:  // CSR 
-        emit_rvv_print_vtype_preserve(ctx, reg2, reg3, insn, pc, 2);
-        break;
-    
-    case 3:  // Load/store 
-        emit_rvv_print_vtype_preserve(ctx, reg2, reg3, insn, pc, 3);
-        break;
-    
-    default:
-        return 0;  // Not rvv should not be reached
-    }
+    emit_rvv_print_vtype_preserve(ctx, reg2, reg3, insn, pc, inst_type);
     
     emit_counter64_incr(ctx, &vector_inst_count, 1);
     
