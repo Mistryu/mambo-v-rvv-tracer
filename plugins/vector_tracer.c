@@ -7,6 +7,14 @@
 
 #include <stdint.h>
 
+
+// TODO there are some instructions that require additional tracing
+// For example partial sotore and segmented store etc.
+
+// TODO check all instructions and which ones are supported and to what degree
+// Some instructions could load multiple values etc. 
+// Make file with all instructions and their current progress
+
 #ifndef CSR_VSTART
 #define CSR_VSTART 0x008u
 #endif
@@ -82,6 +90,7 @@ static uint8_t g_saved_rvv[RVV_SAVE_BYTES];
 #define OFF_CSR_RS2      72  // rs2 scalar register value - contains VTYPE
 #define OFF_CSR_VREGS    80  // Vector registers start
 
+static uint64_t vector_inst_count = 0;
 
 void emit_riscv_v_store_1(mambo_context *ctx,
                           unsigned int nf,
@@ -506,6 +515,7 @@ static void rvv_print_to_json(uint32_t insn, uintptr_t pc) {
     fprintf(json_fp, "    \"pc\": \"0x%016" PRIx64 "\",\n", pc);
     fprintf(json_fp, "    \"instruction\": \"0x%08" PRIx32 "\",\n", insn);
     fprintf(json_fp, "    \"type\": %u,\n", buffer_type);
+    fprintf(json_fp, "    \"number\": %lu, \n", vector_inst_count);
     
     if (buffer_type == RVV_TYPE_REG_REG) {
         fprintf(json_fp, "    \"vd\": %u,\n", vd);
@@ -552,8 +562,6 @@ static void rvv_print_to_json(uint32_t insn, uintptr_t pc) {
     // Flush to ensure data is written (but keep file open should be faster this way)
     fflush(json_fp);
 }
-
-static uint64_t vector_inst_count = 0;
 
 // Post-instruction callback that prints instruction data directly to JSON
 static int vector_post_inst_cb(mambo_context *ctx) {
