@@ -11,3 +11,4 @@ vreg_dump.txt
 py_graph/venv/
 riscv-vspec-1.0.pdf
 py_graph
+*.json

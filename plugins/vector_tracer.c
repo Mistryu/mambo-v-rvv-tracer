@@ -58,7 +58,7 @@ static uint8_t g_saved_rvv[RVV_SAVE_BYTES];
 #define OFF_VSTART   32
 #define OFF_VCSR     40
 #define OFF_VLENB    48
-#define OFF_REG_RS1  56
+#define OFF_REG_RS1_RD  56
 #define OFF_VREGS    64
 
 // Buffer offsets - Type 2 Load/store
@@ -189,9 +189,9 @@ static inline void emit_riscv_ld_off(mambo_context *ctx,
 }
 
 // Returns: 0 = not vector, 1 = register-register, 2 = CSR, 3 = load/store
-static inline int rvv_classify_instruction(uint32_t insn) {
-    uint32_t opcode = insn & 0x7F;
-    uint32_t funct3 = (insn >> 12) & 0x7;
+static inline int rvv_classify_instruction(uint32_t inst) {
+    uint32_t opcode = inst & 0x7F;
+    uint32_t funct3 = (inst >> 12) & 0x7;
 
     switch (opcode) {
     case 0x57:  // Vector arithmetic/CSR
@@ -218,22 +218,22 @@ static inline int rvv_classify_instruction(uint32_t insn) {
 }
 
 bool mambo_is_vector(mambo_context *ctx) {
-    uint32_t insn = *(uint32_t *)ctx->code.read_address;
-    return rvv_classify_instruction(insn) != 0;
+    uint32_t inst = *(uint32_t *)ctx->code.read_address;
+    return rvv_classify_instruction(inst) != 0;
 }
 
 // Extract register fields from RISC-V vector instruction encoding
 // vd = bits [11:7]
 // vs1 = bits [19:15]
 // vs2 = bits [24:20]
-static inline void rvv_extract_regs(uint32_t insn, uint8_t *vd, uint8_t *vs1, uint8_t *vs2) {
-    *vd = (insn >> 7) & 0x1F;
-    *vs1 = (insn >> 15) & 0x1F;
-    *vs2 = (insn >> 20) & 0x1F;
+static inline void rvv_extract_regs(uint32_t inst, uint8_t *vd, uint8_t *vs1, uint8_t *vs2) {
+    *vd = (inst >> 7) & 0x1F;
+    *vs1 = (inst >> 15) & 0x1F;
+    *vs2 = (inst >> 20) & 0x1F;
 }
 
 // Forward declarations
-static void rvv_print_to_json(uint32_t insn, uintptr_t pc);
+static void rvv_print_to_json(uint32_t inst, uintptr_t pc);
 
 // Register numbers
 #define X_SP  2u
@@ -242,9 +242,6 @@ static void rvv_print_to_json(uint32_t insn, uintptr_t pc);
 #define X_A0 10u
 #define X_A1 11u
 
-//TODO: this is hardcoded for 2048, we should make it dynamic since Vlenb can be different then 256
-// Each group of 8 registers takes VLENB bytes. If VLENB = 256, then 8 * 256 = 2048 bytes.
-// Ask if this is a potential issue. Fix should be simple. 
 static inline void emit_addi_2048(mambo_context *ctx, unsigned rd, unsigned rs)
 {
     // rd = rs + 2048 (addi immediate max is 2047)
@@ -260,17 +257,17 @@ static inline void emit_addi_2048(mambo_context *ctx, unsigned rd, unsigned rs)
 static inline void emit_rvv_print_vtype_preserve(mambo_context *ctx,
                                                  unsigned tmp0,
                                                  unsigned tmp1,
-                                                 uint32_t insn,
+                                                 uint32_t inst,
                                                  uintptr_t pc,
                                                  int inst_type)
 {
     uint8_t buffer_type;
-    int pc_offset, vl_offset, vtype_offset, vstart_offset, vcsr_offset, vlenb_offset, vregs_offset, rs1_offset;
-    int func3 = (insn >> 12) & 0x7;
-    // Order: reg-reg (most common), load/store, CSR (least common)
+    int pc_offset, vl_offset, vtype_offset, vstart_offset, vcsr_offset, vlenb_offset, vregs_offset, rs1_rd_offset;
+    int func3 = (inst >> 12) & 0x7;
+
     if (inst_type == 1) { // Register-register (most common)
         buffer_type = RVV_TYPE_REG_REG;
-        rs1_offset = OFF_REG_RS1;
+        rs1_rd_offset = OFF_REG_RS1_RD;
         pc_offset = OFF_PC;
         vl_offset = OFF_VL;
         vtype_offset = OFF_VTYPE;
@@ -280,7 +277,7 @@ static inline void emit_rvv_print_vtype_preserve(mambo_context *ctx,
         vregs_offset = OFF_VREGS;
     } else if (inst_type == 3) { // Load/store (second most common)
         buffer_type = RVV_TYPE_LOAD_STORE;
-        rs1_offset = OFF_LS_RS1;
+        rs1_rd_offset = OFF_LS_RS1;
         pc_offset = OFF_LS_PC;
         vl_offset = OFF_LS_VL;
         vtype_offset = OFF_LS_VTYPE;
@@ -328,24 +325,24 @@ static inline void emit_rvv_print_vtype_preserve(mambo_context *ctx,
     emit_riscv_csrw_imm(ctx, CSR_VSTART, 0);
 
     // For load/store, save rs1 value
-    if (inst_type == 3 || (inst_type == 1 && ((func3 == 0b100) || (func3 == 0b101) || (func3 == 0b110)))) { // load/store or OPIVX/OPIVF/OPMVX
-        uint8_t rs1_num = (insn >> 15) & 0x1F;
+    if (inst_type == 3 || (inst_type == 1 && ((func3 == 0b100) || (func3 == 0b101) || (func3 == 0b110)))) { // load/store or OPIVX/OPFVF/OPMVX
+        uint8_t rs1_num = (inst >> 15) & 0x1F;
         
         // Read rs1 
         emit_mov(ctx, X_T5, (enum reg)rs1_num);
-        emit_riscv_sd_off(ctx, X_T5, X_A0, rs1_offset);
+        emit_riscv_sd_off(ctx, X_T5, X_A0, rs1_rd_offset);
 
         // For segmented load/store save rs2
-        if (((insn >> 26) & 0x3) == 0b10) { 
-            uint8_t rs2_num = (insn >> 20) & 0x1F;
+        if (((inst >> 26) & 0x3) == 0b10) { 
+            uint8_t rs2_num = (inst >> 20) & 0x1F;
             emit_mov(ctx, X_T5, (enum reg)rs2_num);
             emit_riscv_sd_off(ctx, X_T5, X_A0, OFF_LS_RS2);
         }
 
     } else if (inst_type == 2) { // For CSR instructions, saving rd, rs1, and rs2 values
-        uint8_t rd_num = (insn >> 7) & 0x1F;
-        uint8_t rs1_num = (insn >> 15) & 0x1F;
-        uint8_t rs2_num = (insn >> 20) & 0x1F;
+        uint8_t rd_num = (inst >> 7) & 0x1F;
+        uint8_t rs1_num = (inst >> 15) & 0x1F;
+        uint8_t rs2_num = (inst >> 20) & 0x1F;
         
         // Read rd
         emit_mov(ctx, X_T5, (enum reg)rd_num);
@@ -358,6 +355,11 @@ static inline void emit_rvv_print_vtype_preserve(mambo_context *ctx,
         // Read rs2
         emit_mov(ctx, X_T5, (enum reg)rs2_num);
         emit_riscv_sd_off(ctx, X_T5, X_A0, OFF_CSR_RS2);
+    } else if (inst_type == 1 && (func3 == 0b010 || func3 == 0b001) && (((inst >> 26) & 0x3F) == 0b100000)) {  // Special instructions VWXUNARY0, VWFUNARY0
+        uint8_t rd_num = (inst >> 7) & 0x1F;
+
+        emit_mov(ctx, X_T5, (enum reg)rd_num);
+        emit_riscv_sd_off(ctx, X_T5, X_A0, rs1_rd_offset);
     }
 
     // Save vector registers to buffer
@@ -380,7 +382,7 @@ static inline void emit_rvv_print_vtype_preserve(mambo_context *ctx,
     emit_riscv_addi(ctx, X_SP, X_SP, 16);
 
     // Call the C function to write to JSON with instruction and PC
-    emit_set_reg(ctx, reg0, (uintptr_t)insn);
+    emit_set_reg(ctx, reg0, (uintptr_t)inst);
     emit_set_reg(ctx, reg1, pc);
     emit_safe_fcall(ctx, (void*)rvv_print_to_json, 2);
 
@@ -459,9 +461,9 @@ static inline int32_t extract_lmul_x8_from_vtype(uint64_t vtype) {
     }
 }
 
-static inline bool is_widening_instruction(uint32_t insn, uint32_t vs1) {
-    uint32_t funct3 = (insn >> 12) & 0x7;
-    uint32_t funct6 = (insn >> 26) & 0x3F;
+static inline bool is_widening_instruction(uint32_t inst, uint32_t vs1) {
+    uint32_t funct3 = (inst >> 12) & 0x7;
+    uint32_t funct6 = (inst >> 26) & 0x3F;
 
     // widening converts
     if (funct3 == 0b001) {
@@ -472,11 +474,11 @@ static inline bool is_widening_instruction(uint32_t insn, uint32_t vs1) {
     return ((funct6 >= 0b110000) && (funct6 <= 0b111111));
 }
 
-static inline bool is_narrowing_instruction(uint32_t insn, uint32_t vs1) {
-    uint32_t funct3 = (insn >> 12) & 0x7; 
+static inline bool is_narrowing_instruction(uint32_t inst, uint32_t vs1) {
+    uint32_t funct3 = (inst >> 12) & 0x7; 
     if (funct3 != 0b000 && funct3 != 0b011 && funct3 != 0b100 && funct3 != 0b001) return false;
 
-    uint32_t funct6 = (insn >> 26) & 0x3F;
+    uint32_t funct6 = (inst >> 26) & 0x3F;
     
     // narrowing converts
     if (funct3 == 0b001) {
@@ -486,6 +488,47 @@ static inline bool is_narrowing_instruction(uint32_t insn, uint32_t vs1) {
 
      // vnsrl, vnsra, vnclipu, vnclip
     return (funct6 >= 0b101100 && funct6 <= 0b101111);
+}
+
+
+static inline bool is_reduction_instruction(uint32_t inst) {
+
+    uint32_t funct3 = (inst >> 12) & 0x7;
+    uint32_t funct6 = (inst >> 26) & 0x3F;
+    
+    if (funct3 == 0b010) {// vredsum, vredand, vredor, vredxor, vredminu, vredmin, vredmaxu, vredmax
+        return (funct6 >= 0b000000 && funct6 <= 0b000111); 
+    }
+    if (funct3 == 0b000) { // vwredsumu, vwredsum
+        return (funct6 == 0b110000) || (funct6 == 0b110001);
+    }
+    if (funct3 == 0b001) {
+        return (funct6 == 0b000001) ||  // vfredusum
+               (funct6 == 0b000011) ||  // vfredosum
+               (funct6 == 0b000101) ||  // vfredmin
+               (funct6 == 0b000111) ||  // vfredmax
+               (funct6 == 0b110001) ||  // vfwredusum
+               (funct6 == 0b110011);    // vfwredosum
+    }
+    
+    return false;
+}
+
+//TODO fix VXUNARY0 encoding
+static inline bool is_VWXUNARY0_or_VWFUNARY0(uint8_t funct3, uint32_t funct6) {
+    return (funct3 == 0b010 || funct3 == 0b001) && funct6 == 0b010000;
+}
+
+static inline bool is_VRXUNARY0_or_VRFUNARY0(uint8_t funct3, uint32_t funct6) {
+    return (funct3 == 0b101 || funct3 == 0b110) && funct6 == 0b010000;
+}
+
+static inline bool is_VMUNARY0(uint8_t funct3, uint32_t funct6) {
+    return funct6 == 0b010100 && funct3 == 0b010;
+}
+
+static inline bool is_vmv_nr_r(uint8_t funct3, uint32_t funct6) {
+    return funct6 == 0b100111 && funct3 == 0b011;
 }
 
 // Helper function to print register data as hex string in JSON output
@@ -500,12 +543,16 @@ static inline void print_vreg_data_json(FILE *fp,
     
     fprintf(fp, "[\n");
     for (uint8_t i = 0; i < reg_count; i++) {
+
         uint64_t offset = calc_vreg_offset(vreg_start + i, vlenb);
+        
         const uint8_t *vreg_data = vregs_base + offset;
         char vreg_hex[RVV_VREG_BYTES * 2 + 1];
+
         vreg_to_hex_string(vreg_hex, sizeof(vreg_hex), vreg_data, (size_t)vlenb);
         
         fprintf(fp, "      \"%s\"", vreg_hex);
+
         if (i < reg_count - 1) fprintf(fp, ",");
         fprintf(fp, "\n");
     }
@@ -516,9 +563,35 @@ static inline void print_vreg_data_json(FILE *fp,
 static FILE *json_fp = NULL;
 static bool json_first_entry = true;
 
+/* TODO: problmatic instructions:
+
+    Logic grouping: // Done
+    1. vmv.s.x vd, rs1
+
+    // vmv.s.x vd, rs1
+    // vfmv.s.f vd, rs1 
+
+    // Done VRFUNARY0 && VWXUNARY0
+    2.  vmv.x.s rd, vs2
+    // vmv.x.s rd, vs2
+    // vfmv.f.s rd, vs2
+    // vcpop.m rd, vs2, vm
+    // vfirst.m rd, vs2, vm
+
+    3. Done VMUNARY0 encoding space vid also prints vs2 which should be v0
+    viota.m vd, vs2, vm
+    vid.v vd, vm
+    vmsbf.m vd, vs2, vm
+
+    4. vmv<nr>r cd, vs1 Done
+
+    5.     Vector Compress vcompress.vm vd, vs2, vs1, vm
+    Most likely has to be changed in the UI 
+
+
+*/
 // Prints a single instruction entry to JSON file
-// Reads vd, vs1, vs2 from g_saved_rvv buffer based on type
-static void rvv_print_to_json(uint32_t insn, uintptr_t pc) {
+static void rvv_print_to_json(uint32_t inst, uintptr_t pc) {
 
     if (json_fp == NULL) {
         json_fp = fopen("vector_trace.json", "a");
@@ -560,19 +633,15 @@ static void rvv_print_to_json(uint32_t insn, uintptr_t pc) {
     
     // Extract register numbers from instruction
     uint8_t vd, vs1_rs1_imm, vs2_rs2;
-    rvv_extract_regs(insn, &vd, &vs1_rs1_imm, &vs2_rs2);
+    rvv_extract_regs(inst, &vd, &vs1_rs1_imm, &vs2_rs2);
 
     int32_t lmul_x8 = extract_lmul_x8_from_vtype(vtype);
-    int8_t funct3 = (insn >> 12) & 0x7;
+    uint8_t funct3 = (inst >> 12) & 0x7;
+    uint8_t funct6 = (inst >> 26) & 0x3F;
 
     const uint8_t *vregs_base = g_saved_rvv + vregs_offset;
     
-    uint64_t vd_offset = calc_vreg_offset(vd, vlenb);
-    uint64_t vs1_offset = calc_vreg_offset(vs1_rs1_imm, vlenb);
     uint64_t vs2_offset = calc_vreg_offset(vs2_rs2, vlenb);
-    
-    const uint8_t *vd_data = vregs_base + vd_offset;
-    const uint8_t *vs1_data = vregs_base + vs1_offset;
     const uint8_t *vs2_data = vregs_base + vs2_offset;
 
     // Writing JSON entry
@@ -583,7 +652,7 @@ static void rvv_print_to_json(uint32_t insn, uintptr_t pc) {
     
     fprintf(json_fp, "  {\n");
     fprintf(json_fp, "    \"pc\": \"0x%016" PRIx64 "\",\n", pc);
-    fprintf(json_fp, "    \"instruction\": \"0x%08" PRIx32 "\",\n", insn);
+    fprintf(json_fp, "    \"instruction\": \"0x%08" PRIx32 "\",\n", inst);
     fprintf(json_fp, "    \"type\": %u,\n", buffer_type);
     fprintf(json_fp, "    \"number\": %lu, \n", vector_inst_count);
 
@@ -594,46 +663,82 @@ static void rvv_print_to_json(uint32_t insn, uintptr_t pc) {
     }
 
     if (buffer_type == RVV_TYPE_REG_REG) {
+        bool is_widening = is_widening_instruction(inst, vs1_rs1_imm);  
+        bool is_narrowing = is_narrowing_instruction(inst, vs1_rs1_imm);
+        bool is_reduction = is_reduction_instruction(inst);
+        bool is_vmv = is_vmv_nr_r(funct3, funct6);
+        bool is_vrxunary0_or_vrfunary0 = is_VRXUNARY0_or_VRFUNARY0(funct3, funct6);
+        bool is_vwxunary0_or_vwfunary0 = is_VWXUNARY0_or_VWFUNARY0(funct3, funct6);
 
-        bool is_widening = is_widening_instruction(insn, vs1_rs1_imm);  
-        bool is_narrowing = is_narrowing_instruction(insn, vs1_rs1_imm);
+        if (is_reduction) fprintf( json_fp, "    \"reduction\": true,\n");
 
         // lmul_x8 / 8 gives number of registers
         uint8_t vd_reg_count = is_widening ? (uint8_t)(lmul_x8 / 4) : (uint8_t)(lmul_x8 / 8);
         if (vd_reg_count < 1) vd_reg_count = 1;
 
-        fprintf(json_fp, "    \"vd\": %u,\n", vd);
-        print_vreg_data_json(json_fp, "vd_data", vd, vd_reg_count, vregs_base, vlenb);
-        fprintf(json_fp, ",\n");
+        vd_reg_count = is_reduction ? 1 : vd_reg_count; // For reductions, only vd 0 is the output
+        vd_reg_count = is_vmv ? ((inst >> 15) & 0x7) + 1 : vd_reg_count; // For vmv.<nr>.r, number of registers is encoded in simm field (bits [17:15]) and works same as nf in load/store instructions
+        vd_reg_count = is_vrxunary0_or_vrfunary0 ? 1 : vd_reg_count; // skips lmul and only uses 1 register
+        vd_reg_count = is_vwxunary0_or_vwfunary0 ? 1 : vd_reg_count; // skips lmul and only uses 1 register
 
+        if (!is_vwxunary0_or_vwfunary0) { // They use rd not vd
+
+            fprintf(json_fp, "    \"vd\": %u,\n", vd);
+            print_vreg_data_json(json_fp, "vd_data", vd, vd_reg_count, vregs_base, vlenb);
+            fprintf(json_fp, ",\n");
+
+        } else {
+            uint64_t rd_value = *(const uint64_t *)(g_saved_rvv + OFF_REG_RS1_RD);
+
+            fprintf(json_fp, "    \"rd\": %u,\n", vd);
+            fprintf(json_fp, "    \"rd_value\": \"0x%016" PRIx64 "\",\n", rd_value);
+        }
+
+        
         if (funct3 == 0b011) { // OPIVI
             fprintf(json_fp, "    \"imm\": %u,\n", vs1_rs1_imm);
         }
+
         else if (funct3 == 0b100 || funct3 == 0b101 || funct3 == 0b110) { // OPIVX, OPIVF, OPMVX
             uint64_t rs1_value = *(const uint64_t *)(g_saved_rvv + OFF_LS_RS1);
 
             fprintf(json_fp, "    \"rs1\": %u,\n", vs1_rs1_imm);
-            fprintf(json_fp, "    \"rs1_value\": \"0x%016" PRIx64 "\",\n", rs1_value);
-        } else {
+            fprintf(json_fp, "    \"rs1_value\": \"0x%016" PRIx64 "\"", rs1_value);
+
+            if (is_vrxunary0_or_vrfunary0) {
+                fprintf(json_fp, "\n");
+            } else {
+                fprintf(json_fp, ",\n");
+            }
+
+        } else if (!is_vwxunary0_or_vwfunary0 && !is_VMUNARY0(funct3, funct6)) {
             uint8_t vs1_reg_count = (lmul_x8 >= 8) ? (uint8_t)(lmul_x8 / 8) : 1;
+            vs1_reg_count = is_reduction ? 1 : vs1_reg_count;
 
             fprintf(json_fp, "    \"vs1\": %u,\n", vs1_rs1_imm);
             print_vreg_data_json(json_fp, "vs1_data", vs1_rs1_imm, vs1_reg_count, vregs_base, vlenb);
             fprintf(json_fp, ",\n");
         }
 
-        fprintf(json_fp, "    \"vs2\": %u,\n", vs2_rs2);
-        uint8_t vs2_reg_count = is_narrowing ? (uint8_t)(lmul_x8 / 4) : (uint8_t)(lmul_x8 / 8);
-        if (vs2_reg_count < 1) vs2_reg_count = 1;
-        print_vreg_data_json(json_fp, "vs2_data", vs2_rs2, vs2_reg_count, vregs_base, vlenb);
+
+        if (!is_vrxunary0_or_vrfunary0) { // Excluding VRXUNARY0 and VRFUNARY0
+            fprintf(json_fp, "    \"vs2\": %u,\n", vs2_rs2);
+            
+            uint8_t vs2_reg_count = is_narrowing ? (uint8_t)(lmul_x8 / 4) : (uint8_t)(lmul_x8 / 8);
+            vs2_reg_count = is_vmv ? vd_reg_count : vs2_reg_count; // For vmv.<nr>.r, vs2 register count is same as vd
+            vs2_reg_count = is_vwxunary0_or_vwfunary0 ? 1 : vs2_reg_count; // For VRXUNARY0 and VRFUNARY0, vs2 is source and only uses 1 register
+
+            if (vs2_reg_count < 1) vs2_reg_count = 1;
+            print_vreg_data_json(json_fp, "vs2_data", vs2_rs2, vs2_reg_count, vregs_base, vlenb);
+        }
 
 
     } else if (buffer_type == RVV_TYPE_LOAD_STORE) {
         uint64_t rs1_value = *(const uint64_t *)(g_saved_rvv + OFF_LS_RS1);
-        uint8_t mop = (insn >> 26) & 0x3;
+        uint8_t mop = (inst >> 26) & 0x3;
 
         // nf = bits [31:29] + 1; multiply by LMUL (= lmul_x8/8)
-        uint8_t nf = ((insn >> 29) & 0x7) + 1;
+        uint8_t nf = ((inst >> 29) & 0x7) + 1;
         uint8_t num_of_destination_reg = (uint8_t)((nf * lmul_x8) / 8);
         if (num_of_destination_reg < 1) num_of_destination_reg = 1;
 
@@ -642,9 +747,13 @@ static void rvv_print_to_json(uint32_t insn, uintptr_t pc) {
         
         if (mop == 0b10) { // strided
             uint64_t rs2_value = *(const uint64_t *)(g_saved_rvv + OFF_LS_RS2);
+
             fprintf(json_fp, "    \"rs2\": %u,\n", vs2_rs2);
             fprintf(json_fp, "    \"rs2_value\": \"0x%016" PRIx64 "\",\n", rs2_value);
+
         } else if ((mop == 0b01) || (mop == 0b11)) { // Indexed
+
+            //TODO ask how does it work exactly and wheather I have to trace more then 1 vs2 register page 38
             fprintf(json_fp, "    \"vs2\": %u,\n", vs2_rs2);
             
             char vreg_hex[RVV_VREG_BYTES * 2 + 1];
@@ -686,15 +795,15 @@ static void rvv_print_to_json(uint32_t insn, uintptr_t pc) {
 
 // Post-instruction callback that prints instruction data directly to JSON
 static int vector_post_inst_cb(mambo_context *ctx) {
-    uint32_t insn = *(uint32_t *)ctx->code.read_address;
-    int inst_type = rvv_classify_instruction(insn);
+    uint32_t inst = *(uint32_t *)ctx->code.read_address;
+    int inst_type = rvv_classify_instruction(inst);
     
     if (inst_type == 0) return 0;
 
     emit_counter64_incr(ctx, &all_inst_count, 1);
 
     uintptr_t pc = (uintptr_t)ctx->code.read_address;
-    emit_rvv_print_vtype_preserve(ctx, reg2, reg3, insn, pc, inst_type);
+    emit_rvv_print_vtype_preserve(ctx, reg2, reg3, inst, pc, inst_type);
     
     emit_counter64_incr(ctx, &vector_inst_count, 1);
     
