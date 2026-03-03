@@ -33,6 +33,7 @@
 #define RVV_SUMOP_WHOLE 0x08u
 #endif
 
+//TODO remove unecessary entries
 // Buffer layout for g_saved_rvv
 #define RVV_VREG_BYTES      256u      // Max bytes per vector register
 #define RVV_NUM_VREGS       32u        // Total vector registers
@@ -89,6 +90,17 @@ static uint8_t g_saved_rvv[RVV_SAVE_BYTES];
 static uint64_t vector_inst_count = 0;
 static uint64_t all_inst_count = 0;
 
+//func3 encoding
+#define OPIVV 0b000
+#define OPFVV 0b001
+#define OPMVV 0b010
+#define OPIVI 0b011
+#define OPIVX 0b100
+#define OPFVF 0b101
+#define OPMVX 0b110
+#define OPCFG 0b111
+
+
 void emit_riscv_v_store_1(mambo_context *ctx,
                           unsigned int nf,
                           unsigned int mew,
@@ -134,7 +146,7 @@ static inline void emit_riscv_vsetvli(mambo_context *ctx,
                               vm_bit,
                               vs2,
                               rs1_avl,
-                              0x7,          // funct3 = 111
+                              OPCFG,          // funct3 = 111
                               rd);
 }
 
@@ -148,7 +160,7 @@ static inline void emit_riscv_vsetvl(mambo_context *ctx,
                               0,            // bit25 must be 0
                               rs2_vtype,    // vs2 = rs2
                               rs1_avl,      // vs1 = rs1
-                              0x7,          // funct3 = 111
+                              OPCFG,          // funct3 = 111
                               rd);
 }
 
@@ -195,7 +207,7 @@ static inline int rvv_classify_instruction(uint32_t inst) {
 
     switch (opcode) {
     case 0x57:  // Vector arithmetic/CSR
-        if (funct3 == 0b111) {
+        if (funct3 == OPCFG) {
             return 2;  // CSR vsetvli, vsetvl
         }
         return 1;  // Register-register
@@ -220,16 +232,6 @@ static inline int rvv_classify_instruction(uint32_t inst) {
 bool mambo_is_vector(mambo_context *ctx) {
     uint32_t inst = *(uint32_t *)ctx->code.read_address;
     return rvv_classify_instruction(inst) != 0;
-}
-
-// Extract register fields from RISC-V vector instruction encoding
-// vd = bits [11:7]
-// vs1 = bits [19:15]
-// vs2 = bits [24:20]
-static inline void rvv_extract_regs(uint32_t inst, uint8_t *vd, uint8_t *vs1, uint8_t *vs2) {
-    *vd = (inst >> 7) & 0x1F;
-    *vs1 = (inst >> 15) & 0x1F;
-    *vs2 = (inst >> 20) & 0x1F;
 }
 
 // Forward declarations
@@ -325,7 +327,7 @@ static inline void emit_rvv_print_vtype_preserve(mambo_context *ctx,
     emit_riscv_csrw_imm(ctx, CSR_VSTART, 0);
 
     // For load/store, save rs1 value
-    if (inst_type == 3 || (inst_type == 1 && ((func3 == 0b100) || (func3 == 0b101) || (func3 == 0b110)))) { // load/store or OPIVX/OPFVF/OPMVX
+    if (inst_type == 3 || (inst_type == 1 && ((func3 == OPIVX) || (func3 == OPFVF) || (func3 == OPMVX)))) { // load/store or OPIVX/OPFVF/OPMVX
         uint8_t rs1_num = (inst >> 15) & 0x1F;
         
         // Read rs1 
@@ -355,7 +357,7 @@ static inline void emit_rvv_print_vtype_preserve(mambo_context *ctx,
         // Read rs2
         emit_mov(ctx, X_T5, (enum reg)rs2_num);
         emit_riscv_sd_off(ctx, X_T5, X_A0, OFF_CSR_RS2);
-    } else if (inst_type == 1 && (func3 == 0b010 || func3 == 0b001) && (((inst >> 26) & 0x3F) == 0b100000)) {  // Special instructions VWXUNARY0, VWFUNARY0
+    } else if (inst_type == 1 && (func3 == OPMVV || func3 == OPFVV) && (((inst >> 26) & 0x3F) == 0b100000)) {  // Special instructions VWXUNARY0, VWFUNARY0
         uint8_t rd_num = (inst >> 7) & 0x1F;
 
         emit_mov(ctx, X_T5, (enum reg)rd_num);
@@ -461,12 +463,22 @@ static inline int32_t extract_lmul_x8_from_vtype(uint64_t vtype) {
     }
 }
 
+// Extract register fields from RISC-V vector instruction encoding
+// vd = bits [11:7]
+// vs1 = bits [19:15]
+// vs2 = bits [24:20]
+static inline void rvv_extract_regs(uint32_t inst, uint8_t *vd, uint8_t *vs1, uint8_t *vs2) {
+    *vd = (inst >> 7) & 0x1F;
+    *vs1 = (inst >> 15) & 0x1F;
+    *vs2 = (inst >> 20) & 0x1F;
+}
+
 static inline bool is_widening_instruction(uint32_t inst, uint32_t vs1) {
     uint32_t funct3 = (inst >> 12) & 0x7;
     uint32_t funct6 = (inst >> 26) & 0x3F;
 
     // widening converts
-    if (funct3 == 0b001) {
+    if (funct3 == OPFVV) {
         if (funct6 != 0b010010) return false;
         return (vs1 >= 0b01000 && vs1 <= 0b01111); 
     }
@@ -476,12 +488,12 @@ static inline bool is_widening_instruction(uint32_t inst, uint32_t vs1) {
 
 static inline bool is_narrowing_instruction(uint32_t inst, uint32_t vs1) {
     uint32_t funct3 = (inst >> 12) & 0x7; 
-    if (funct3 != 0b000 && funct3 != 0b011 && funct3 != 0b100 && funct3 != 0b001) return false;
+    if (funct3 != OPIVV && funct3 != OPIVI && funct3 != OPIVX && funct3 != OPFVV) return false;
 
     uint32_t funct6 = (inst >> 26) & 0x3F;
     
     // narrowing converts
-    if (funct3 == 0b001) {
+    if (funct3 == OPFVV) {
         if (funct6 != 0b010010) return false;
         return (vs1 >= 0b10000 && vs1 <= 0b10111); 
     }
@@ -496,13 +508,13 @@ static inline bool is_reduction_instruction(uint32_t inst) {
     uint32_t funct3 = (inst >> 12) & 0x7;
     uint32_t funct6 = (inst >> 26) & 0x3F;
     
-    if (funct3 == 0b010) {// vredsum, vredand, vredor, vredxor, vredminu, vredmin, vredmaxu, vredmax
+    if (funct3 == OPMVV) {// vredsum, vredand, vredor, vredxor, vredminu, vredmin, vredmaxu, vredmax
         return (funct6 >= 0b000000 && funct6 <= 0b000111); 
     }
-    if (funct3 == 0b000) { // vwredsumu, vwredsum
+    if (funct3 == OPIVV) { // vwredsumu, vwredsum
         return (funct6 == 0b110000) || (funct6 == 0b110001);
     }
-    if (funct3 == 0b001) {
+    if (funct3 == OPFVV) {
         return (funct6 == 0b000001) ||  // vfredusum
                (funct6 == 0b000011) ||  // vfredosum
                (funct6 == 0b000101) ||  // vfredmin
@@ -514,21 +526,42 @@ static inline bool is_reduction_instruction(uint32_t inst) {
     return false;
 }
 
-//TODO fix VXUNARY0 encoding
 static inline bool is_VWXUNARY0_or_VWFUNARY0(uint8_t funct3, uint32_t funct6) {
-    return (funct3 == 0b010 || funct3 == 0b001) && funct6 == 0b010000;
+    return (funct3 == OPMVV || funct3 == OPFVV) && funct6 == 0b010000;
 }
 
 static inline bool is_VRXUNARY0_or_VRFUNARY0(uint8_t funct3, uint32_t funct6) {
-    return (funct3 == 0b101 || funct3 == 0b110) && funct6 == 0b010000;
+    return (funct3 == OPFVF || funct3 == OPMVX) && funct6 == 0b010000;
 }
 
-static inline bool is_VMUNARY0(uint8_t funct3, uint32_t funct6) {
-    return funct6 == 0b010100 && funct3 == 0b010;
+static inline bool is_VMUNARY0_or_VXUNARY0_or_VFUNARY0_VFUNARY1(uint8_t funct3, uint32_t funct6) {
+    return ((funct6 == 0b010100 || funct6 == 0b010010) && funct3 == OPMVV) || ((funct6 == 0b010010 || funct6 == 0b010011) && funct3 == OPFVV);
 }
 
 static inline bool is_vmv_nr_r(uint8_t funct3, uint32_t funct6) {
-    return funct6 == 0b100111 && funct3 == 0b011;
+    return funct6 == 0b100111 && funct3 == OPIVI;
+}
+
+static inline bool is_vid(uint8_t funct3, uint32_t funct6, uint8_t vs1) {
+    return funct6 == 0b010100 && funct3 == OPMVV && vs1 == 0b10001;
+}
+
+// Handling of extension instructions source register size (vzext.vfN and vsext.vfN)
+// returns 1 if not an VXUNARY0 instructoin 
+static inline uint8_t get_extension_factor(uint8_t funct3, uint32_t funct6, uint8_t vs1) {
+
+    if (funct3 == OPMVV && funct6 == 0b010010) {
+        // vzext.vf2, vsext.vf2: vs1 = 00110, 00111
+        if ((vs1 == 0b00110) || (vs1 == 0b00111)) return 2;
+        
+        // vzext.vf4, vsext.vf4: vs1 = 00100, 00101
+        if ((vs1 == 0b00100) || (vs1 == 0b00101)) return 4;
+        
+        // vzext.vf8, vsext.vf8: vs1 = 00010, 00011
+        if ((vs1 == 0b00010) || (vs1 == 0b00011)) return 8;
+    }
+
+    return 1;
 }
 
 // Helper function to print register data as hex string in JSON output
@@ -590,6 +623,63 @@ static bool json_first_entry = true;
 
 
 */
+
+// // Add this debug function near the top of the file, after the includes
+// static void debug_extension_instruction(uint32_t inst, 
+//                                         uint64_t vtype,
+//                                         uint64_t vl,
+//                                         uint8_t vd,
+//                                         uint8_t vs2,
+//                                         uint8_t extension_factor,
+//                                         uint8_t vd_reg_count,
+//                                         uint8_t vs2_reg_count)
+// {
+//     fprintf(stderr, "\n=== EXTENSION INSTRUCTION DEBUG ===\n");
+//     fprintf(stderr, "Instruction: 0x%08x\n", inst);
+//     fprintf(stderr, "vtype: 0x%016lx\n", vtype);
+//     fprintf(stderr, "vl: %lu\n", vl);
+//     fprintf(stderr, "Extension factor: %u\n", extension_factor);
+//     fprintf(stderr, "vd: %u, vd_reg_count: %u\n", vd, vd_reg_count);
+//     fprintf(stderr, "vs2: %u, vs2_reg_count: %u\n", vs2, vs2_reg_count);
+    
+//     // Decode vtype
+//     uint8_t vlmul = vtype & 0x7;
+//     uint8_t vsew = (vtype >> 3) & 0x7;
+//     uint8_t vta = (vtype >> 6) & 0x1;
+//     uint8_t vma = (vtype >> 7) & 0x1;
+    
+//     const char *lmul_str[] = {"m1", "m2", "m4", "m8", "RSVD", "mf8", "mf4", "mf2"};
+//     const char *sew_str[] = {"e8", "e16", "e32", "e64", "e128", "e256", "e512", "e1024"};
+    
+//     fprintf(stderr, "vtype decoded: SEW=%s, LMUL=%s, vta=%u, vma=%u\n",
+//             sew_str[vsew], lmul_str[vlmul], vta, vma);
+    
+//     // Calculate expected values
+//     uint32_t lmul_x8 = extract_lmul_x8_from_vtype(vtype);
+//     uint8_t expected_dest_regs = lmul_x8 / 8;
+//     uint8_t expected_src_regs = lmul_x8 / (8 * extension_factor);
+    
+//     if (expected_dest_regs < 1) expected_dest_regs = 1;
+//     if (expected_src_regs < 1) expected_src_regs = 1;
+    
+//     fprintf(stderr, "Expected: dest_regs=%u, src_regs=%u\n", 
+//             expected_dest_regs, expected_src_regs);
+//     fprintf(stderr, "Actual:   dest_regs=%u, src_regs=%u\n",
+//             vd_reg_count, vs2_reg_count);
+    
+//     if (expected_dest_regs != vd_reg_count) {
+//         fprintf(stderr, "⚠️  WARNING: Destination register count mismatch!\n");
+//     }
+//     if (expected_src_regs != vs2_reg_count) {
+//         fprintf(stderr, "⚠️  WARNING: Source register count mismatch!\n");
+//     }
+    
+//     fprintf(stderr, "===================================\n\n");
+// }
+
+
+
+
 // Prints a single instruction entry to JSON file
 static void rvv_print_to_json(uint32_t inst, uintptr_t pc) {
 
@@ -669,8 +759,8 @@ static void rvv_print_to_json(uint32_t inst, uintptr_t pc) {
         bool is_vmv = is_vmv_nr_r(funct3, funct6);
         bool is_vrxunary0_or_vrfunary0 = is_VRXUNARY0_or_VRFUNARY0(funct3, funct6);
         bool is_vwxunary0_or_vwfunary0 = is_VWXUNARY0_or_VWFUNARY0(funct3, funct6);
-
-        if (is_reduction) fprintf( json_fp, "    \"reduction\": true,\n");
+        bool is_vid_inst = is_vid(funct3, funct6, vs1_rs1_imm);
+        uint32_t extension_factor = get_extension_factor(funct3, funct6, vs1_rs1_imm);
 
         // lmul_x8 / 8 gives number of registers
         uint8_t vd_reg_count = is_widening ? (uint8_t)(lmul_x8 / 4) : (uint8_t)(lmul_x8 / 8);
@@ -678,14 +768,16 @@ static void rvv_print_to_json(uint32_t inst, uintptr_t pc) {
 
         vd_reg_count = is_reduction ? 1 : vd_reg_count; // For reductions, only vd 0 is the output
         vd_reg_count = is_vmv ? ((inst >> 15) & 0x7) + 1 : vd_reg_count; // For vmv.<nr>.r, number of registers is encoded in simm field (bits [17:15]) and works same as nf in load/store instructions
-        vd_reg_count = is_vrxunary0_or_vrfunary0 ? 1 : vd_reg_count; // skips lmul and only uses 1 register
-        vd_reg_count = is_vwxunary0_or_vwfunary0 ? 1 : vd_reg_count; // skips lmul and only uses 1 register
+        vd_reg_count = is_vrxunary0_or_vrfunary0 || is_vwxunary0_or_vwfunary0 ? 1 : vd_reg_count; // skips lmul and only uses 1 register
+
 
         if (!is_vwxunary0_or_vwfunary0) { // They use rd not vd
 
             fprintf(json_fp, "    \"vd\": %u,\n", vd);
             print_vreg_data_json(json_fp, "vd_data", vd, vd_reg_count, vregs_base, vlenb);
-            fprintf(json_fp, ",\n");
+            if (!is_vid_inst) {
+                fprintf(json_fp, ",\n");
+            }
 
         } else {
             uint64_t rd_value = *(const uint64_t *)(g_saved_rvv + OFF_REG_RS1_RD);
@@ -699,7 +791,7 @@ static void rvv_print_to_json(uint32_t inst, uintptr_t pc) {
             fprintf(json_fp, "    \"imm\": %u,\n", vs1_rs1_imm);
         }
 
-        else if (funct3 == 0b100 || funct3 == 0b101 || funct3 == 0b110) { // OPIVX, OPIVF, OPMVX
+        else if (funct3 == OPIVX || funct3 == OPFVF || funct3 == OPMVX) {
             uint64_t rs1_value = *(const uint64_t *)(g_saved_rvv + OFF_LS_RS1);
 
             fprintf(json_fp, "    \"rs1\": %u,\n", vs1_rs1_imm);
@@ -711,7 +803,7 @@ static void rvv_print_to_json(uint32_t inst, uintptr_t pc) {
                 fprintf(json_fp, ",\n");
             }
 
-        } else if (!is_vwxunary0_or_vwfunary0 && !is_VMUNARY0(funct3, funct6)) {
+        } else if (!is_vwxunary0_or_vwfunary0 && !is_VMUNARY0_or_VXUNARY0_or_VFUNARY0_VFUNARY1(funct3, funct6)) {
             uint8_t vs1_reg_count = (lmul_x8 >= 8) ? (uint8_t)(lmul_x8 / 8) : 1;
             vs1_reg_count = is_reduction ? 1 : vs1_reg_count;
 
@@ -721,14 +813,27 @@ static void rvv_print_to_json(uint32_t inst, uintptr_t pc) {
         }
 
 
-        if (!is_vrxunary0_or_vrfunary0) { // Excluding VRXUNARY0 and VRFUNARY0
+        if (!is_vrxunary0_or_vrfunary0 && !is_vid_inst) { // Excluding VRXUNARY0 and VRFUNARY0
             fprintf(json_fp, "    \"vs2\": %u,\n", vs2_rs2);
             
             uint8_t vs2_reg_count = is_narrowing ? (uint8_t)(lmul_x8 / 4) : (uint8_t)(lmul_x8 / 8);
             vs2_reg_count = is_vmv ? vd_reg_count : vs2_reg_count; // For vmv.<nr>.r, vs2 register count is same as vd
             vs2_reg_count = is_vwxunary0_or_vwfunary0 ? 1 : vs2_reg_count; // For VRXUNARY0 and VRFUNARY0, vs2 is source and only uses 1 register
+            
+            if (extension_factor > 1) {
+                vs2_reg_count /= extension_factor;
+                fprintf(stderr, "DEBUG: After division: vs2_reg_count=%u\n", vs2_reg_count);
+            }
 
             if (vs2_reg_count < 1) vs2_reg_count = 1;
+
+                // MOVE DEBUG CALL HERE - after vs2_reg_count is fully calculated
+    // if (extension_factor > 1) {
+    //     uint64_t vl = *(const uint64_t *)(g_saved_rvv + vl_offset);
+    //     debug_extension_instruction(inst, vtype, vl, vd, vs2_rs2, 
+    //                                extension_factor, vd_reg_count, vs2_reg_count);  // ← Pass vs2_reg_count!
+    // }
+            
             print_vreg_data_json(json_fp, "vs2_data", vs2_rs2, vs2_reg_count, vregs_base, vlenb);
         }
 

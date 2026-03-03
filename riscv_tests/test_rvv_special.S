@@ -334,18 +334,51 @@ test_rvv_special_asm:
     vmseq.vi v0, v3, 7      // Mask has first bit at position 7
     vfirst.m t4, v0         // Should return 7
     
-    // ========================================
+ // ========================================
     // TEST 13: Widening Integer Extension
     // ========================================
     
     vsetvli t1, t0, e16, m1, ta, ma
     vid.v v2                // 16-bit values
     
-    // Widening zero-extend to 32-bit
-    vzext.vf2 v4, v2        // v4-v5 (e32, m2)
+    // Widening zero-extend to 32-bit (1 source register)
+    vsetvli t1, t0, e32, m2, ta, ma
+    vzext.vf2 v4, v2        // Source: v2 (1 reg), Dest: v4-v5 (2 regs)
     
-    // Widening sign-extend to 32-bit  
-    vsext.vf2 v6, v2        // v6-v7 (e32, m2)
+    // Widening sign-extend to 32-bit (1 source register)
+    vsext.vf2 v6, v2        // Source: v2 (1 reg), Dest: v6-v7 (2 regs)
+    
+    // ========================================
+    // TEST 14: Extension with 2 Source Registers
+    // ========================================
+    
+    // vzext.vf2: 2 source registers
+    vsetvli t1, t0, e16, m2, ta, ma  // Use symbolic form (assembler will encode)
+    vid.v v8                         // Create e16 data: v8-v9 (2 regs)
+
+    vsetvli t1, t0, e32, m4, ta, ma  // Use symbolic form
+    vzext.vf2 v12, v8                // Source: v8-v9 (2 regs), Dest: v12-v15 (4 regs)
+
+    // vsext.vf2: 2 source registers
+    vsetvli t1, t0, e16, m2, ta, ma
+    vid.v v10                        // Create e16 data: v10-v11 (2 regs)
+
+    vsetvli t1, t0, e32, m4, ta, ma
+    vsext.vf2 v16, v10               // Source: v10-v11 (2 regs), Dest: v16-v19 (4 regs)
+
+    // vzext.vf4: 2 source registers
+    vsetvli t1, t0, e16, m2, ta, ma
+    vid.v v20                        // Create e16 data: v20-v21 (2 regs)
+
+    vsetvli t1, t0, e64, m8, ta, ma
+    vzext.vf4 v24, v20               // Source: v20-v21 (2 regs), Dest: v24-v31 (8 regs)
+
+    // vsext.vf4: 2 source registers
+    vsetvli t1, t0, e16, m2, ta, ma
+    vid.v v8                         // Reuse v8-v9 (2 regs)
+
+    vsetvli t1, t0, e64, m8, ta, ma
+    vsext.vf4 v16, v8                // Source: v8-v9 (2 regs), Dest: v16-v23 (8 regs)
     
     // ========================================
     // Done
