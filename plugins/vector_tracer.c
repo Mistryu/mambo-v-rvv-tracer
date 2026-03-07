@@ -88,7 +88,7 @@ static uint8_t g_saved_rvv[RVV_SAVE_BYTES];
 #define OFF_CSR_VREGS    80  // Vector registers start
 
 static uint64_t vector_inst_count = 0;
-static uint64_t all_inst_count = 0;
+// static uint64_t all_inst_count = 0;
 
 //func3 encoding
 #define OPIVV 0b000
@@ -620,63 +620,7 @@ static bool json_first_entry = true;
 
     5.     Vector Compress vcompress.vm vd, vs2, vs1, vm
     Most likely has to be changed in the UI 
-
-
 */
-
-// // Add this debug function near the top of the file, after the includes
-// static void debug_extension_instruction(uint32_t inst, 
-//                                         uint64_t vtype,
-//                                         uint64_t vl,
-//                                         uint8_t vd,
-//                                         uint8_t vs2,
-//                                         uint8_t extension_factor,
-//                                         uint8_t vd_reg_count,
-//                                         uint8_t vs2_reg_count)
-// {
-//     fprintf(stderr, "\n=== EXTENSION INSTRUCTION DEBUG ===\n");
-//     fprintf(stderr, "Instruction: 0x%08x\n", inst);
-//     fprintf(stderr, "vtype: 0x%016lx\n", vtype);
-//     fprintf(stderr, "vl: %lu\n", vl);
-//     fprintf(stderr, "Extension factor: %u\n", extension_factor);
-//     fprintf(stderr, "vd: %u, vd_reg_count: %u\n", vd, vd_reg_count);
-//     fprintf(stderr, "vs2: %u, vs2_reg_count: %u\n", vs2, vs2_reg_count);
-    
-//     // Decode vtype
-//     uint8_t vlmul = vtype & 0x7;
-//     uint8_t vsew = (vtype >> 3) & 0x7;
-//     uint8_t vta = (vtype >> 6) & 0x1;
-//     uint8_t vma = (vtype >> 7) & 0x1;
-    
-//     const char *lmul_str[] = {"m1", "m2", "m4", "m8", "RSVD", "mf8", "mf4", "mf2"};
-//     const char *sew_str[] = {"e8", "e16", "e32", "e64", "e128", "e256", "e512", "e1024"};
-    
-//     fprintf(stderr, "vtype decoded: SEW=%s, LMUL=%s, vta=%u, vma=%u\n",
-//             sew_str[vsew], lmul_str[vlmul], vta, vma);
-    
-//     // Calculate expected values
-//     uint32_t lmul_x8 = extract_lmul_x8_from_vtype(vtype);
-//     uint8_t expected_dest_regs = lmul_x8 / 8;
-//     uint8_t expected_src_regs = lmul_x8 / (8 * extension_factor);
-    
-//     if (expected_dest_regs < 1) expected_dest_regs = 1;
-//     if (expected_src_regs < 1) expected_src_regs = 1;
-    
-//     fprintf(stderr, "Expected: dest_regs=%u, src_regs=%u\n", 
-//             expected_dest_regs, expected_src_regs);
-//     fprintf(stderr, "Actual:   dest_regs=%u, src_regs=%u\n",
-//             vd_reg_count, vs2_reg_count);
-    
-//     if (expected_dest_regs != vd_reg_count) {
-//         fprintf(stderr, "⚠️  WARNING: Destination register count mismatch!\n");
-//     }
-//     if (expected_src_regs != vs2_reg_count) {
-//         fprintf(stderr, "⚠️  WARNING: Source register count mismatch!\n");
-//     }
-    
-//     fprintf(stderr, "===================================\n\n");
-// }
-
 
 
 
@@ -905,7 +849,7 @@ static int vector_post_inst_cb(mambo_context *ctx) {
     
     if (inst_type == 0) return 0;
 
-    emit_counter64_incr(ctx, &all_inst_count, 1);
+    //emit_counter64_incr(ctx, &all_inst_count, 1);
 
     uintptr_t pc = (uintptr_t)ctx->code.read_address;
     emit_rvv_print_vtype_preserve(ctx, reg2, reg3, inst, pc, inst_type);
@@ -916,10 +860,10 @@ static int vector_post_inst_cb(mambo_context *ctx) {
 }
 
 // For tracing all instructions we using pre_inst callback.
-static int all_inst_pre_cb(mambo_context *ctx) {
-    emit_counter64_incr(ctx, &all_inst_count, 1);
-    return 0;
-}
+// static int all_inst_pre_cb(mambo_context *ctx) {
+//     emit_counter64_incr(ctx, &all_inst_count, 1);
+//     return 0;
+// }
 
 __attribute__((constructor)) static void main_tracer_init(void) {
     FILE *fp = fopen("vreg_dump.txt", "w");
@@ -941,16 +885,16 @@ __attribute__((constructor)) static void main_tracer_init(void) {
     mambo_context *ctx = mambo_register_plugin();
     int set_cb = mambo_register_post_inst_cb(ctx, &vector_post_inst_cb);
     assert(set_cb == MAMBO_SUCCESS);
-    int set_all_cb = mambo_register_pre_inst_cb(ctx, &all_inst_pre_cb);
-    assert(set_all_cb == MAMBO_SUCCESS);
+    //int set_all_cb = mambo_register_pre_inst_cb(ctx, &all_inst_pre_cb);
+    //assert(set_all_cb == MAMBO_SUCCESS);
 }
 
 // Prints count at exit and finalizes JSON
 __attribute__((destructor)) static void vector_counter_fini(void) {
-    fprintf(stderr, "[vector_counter] total vector instructions executed: %" PRIu64 "\n",
-            vector_inst_count);
-    fprintf(stderr, "[vector_counter] total instructions executed: %" PRIu64 "\n",
-            all_inst_count);
+    // fprintf(stderr, "[vector_counter] total vector instructions executed: %" PRIu64 "\n",
+    //         vector_inst_count);
+    // fprintf(stderr, "[vector_counter] total instructions executed: %" PRIu64 "\n",
+    //         all_inst_count);
     
     if (json_fp != NULL) {
         fprintf(json_fp, "]\n");

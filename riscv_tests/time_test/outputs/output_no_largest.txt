@@ -1,0 +1,57 @@
+--- Native ---
+Program                   Description            Time (s)
+------------------------------------------------------------
+test_rvv_simple           Simple test               0.005
+rvv_simple_filter         Basic loop                0.004
+rvv_image_processing      Larger program            0.005
+rvv_signal_processing     Very large program        0.008
+------------------------------------------------------------
+
+--- DBM ---
+Program                   Description            Time (s)
+------------------------------------------------------------
+test_rvv_simple           Simple test               0.081
+rvv_simple_filter         Basic loop                0.073
+rvv_image_processing      Larger program            1.161
+rvv_signal_processing     Very large program        3.049
+------------------------------------------------------------
+
+--- GDB API Tracer ---
+Program                   Description            Time (s)
+------------------------------------------------------------
+test_rvv_simple           Simple test               1.148
+rvv_simple_filter         Basic loop               10.205
+rvv_image_processing      Larger program         2116.194
+rvv_signal_processing     Very large program     5895.684
+------------------------------------------------------------
+
+--- GDB Basic Tracer ---
+Program                   Description            Time (s)
+------------------------------------------------------------
+test_rvv_simple           Simple test               7.940
+rvv_simple_filter         Basic loop               15.403
+rvv_image_processing      Larger program         5514.164
+------------------------------------------------------------
+
+
+
+ -----    Main comparison    -----
+Program                   Description            Native (s)    DBM (s)   GDB Basic (s)   DBM/Native Basic/Native    Basic/DBM
+----------------------------------------------------------------------------------------------------
+test_rvv_simple           Simple test                 0.005      0.081           7.940       15.59x     1535.06x     98.49x
+rvv_simple_filter         Basic loop                  0.004      0.073          15.403       16.49x     3498.14x    212.16x
+rvv_image_processing      Larger program              0.005      1.161        5514.164      229.14x  1088252.95x   4749.29x
+rvv_signal_processing     Very large program          0.008      3.049          -1.000      360.80x     -118.33x     -0.33x
+Program                   Description            Native (s)    DBM (s)  GDB Tracer API (s)   DBM/Native   API/Native    API/DBM 
+----------------------------------------------------------------------------------------------------
+test_rvv_simple           Simple test                 0.005      0.081           1.148       15.59x      222.05x     14.25x
+rvv_simple_filter         Basic loop                  0.004      0.073          10.205       16.49x     2317.59x    140.56x
+rvv_image_processing      Larger program              0.005      1.161        2116.194      229.14x   417643.42x   1822.66x
+rvv_signal_processing     Very large program          0.008      3.049        5895.684      360.80x   697642.35x   1933.62x
+Program                   Description          GDB Basic (s) GDB Tracer API (s)      GDB/API
+----------------------------------------------------------------------------------------------------
+test_rvv_simple           Simple test                 7.940           1.148        6.91x 
+rvv_simple_filter         Basic loop                 15.403          10.205        1.51x 
+rvv_image_processing      Larger program           5514.164        2116.194        2.61x 
+rvv_signal_processing     Very large program         -1.000        5895.684       -0.00x 
+----------------------------------------------------------------------------------------------------

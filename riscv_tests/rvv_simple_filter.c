@@ -36,7 +36,7 @@ int32_t channel_energy[NUM_CHANNELS];
 
 // Initialize test signal
 void init_signal(void) {
-    printf("Initializing signal...\n");
+    //printf("Initializing signal...\n");
     
     for (int ch = 0; ch < NUM_CHANNELS; ch++) {
         for (int i = 0; i < SIGNAL_LENGTH; i++) {
@@ -53,10 +53,10 @@ void init_signal(void) {
  * Uses vsetvli with e16/m2 and e32/m4 configurations.
  */
 void rvv_fir_filter(void) {
-    printf("\n=== LOOP 1: FIR Filtering ===\n");
+    //printf("\n=== LOOP 1: FIR Filtering ===\n");
     
     for (int ch = 0; ch < NUM_CHANNELS; ch++) {
-        printf("Processing channel %d/%d...\n", ch + 1, NUM_CHANNELS);
+        //printf("Processing channel %d/%d...\n", ch + 1, NUM_CHANNELS);
         
         const int16_t *input = input_signal[ch];
         int16_t *output = filtered_output[ch];
@@ -134,7 +134,7 @@ void rvv_fir_filter(void) {
         memset(output, 0, FILTER_TAPS * sizeof(int16_t));
     }
     
-    printf("Filtering completed.\n");
+    //printf("Filtering completed.\n");
 }
 
 /*
@@ -144,11 +144,11 @@ void rvv_fir_filter(void) {
  * Uses vsetvli with e16/m2 and e32/m4 configurations.
  */
 void rvv_energy_normalize(void) {
-    printf("\n=== LOOP 2: Energy and Normalization ===\n");
+    //printf("\n=== LOOP 2: Energy and Normalization ===\n");
     
     // Compute energy for each channel
     for (int ch = 0; ch < NUM_CHANNELS; ch++) {
-        printf("Computing energy for channel %d/%d...\n", ch + 1, NUM_CHANNELS);
+        //printf("Computing energy for channel %d/%d...\n", ch + 1, NUM_CHANNELS);
         
         int16_t *signal = filtered_output[ch];
         int64_t energy = 0;
@@ -212,7 +212,7 @@ void rvv_energy_normalize(void) {
     if (max_energy == 0) max_energy = 1;
     
     // Normalize all channels
-    printf("Normalizing channels...\n");
+    //printf("Normalizing channels...\n");
     for (int ch = 0; ch < NUM_CHANNELS; ch++) {
         int16_t *signal = filtered_output[ch];
         int32_t scale = (32767 * 1024) / max_energy;
@@ -269,34 +269,34 @@ void rvv_energy_normalize(void) {
         }
     }
     
-    printf("Energy and normalization completed.\n");
+    //printf("Energy and normalization completed.\n");
 }
 
 // Print results
 void print_results(void) {
-    printf("\n=== Results ===\n");
+    //printf("\n=== Results ===\n");
     
-    printf("Channel Energies:\n");
+    //printf("Channel Energies:\n");
     for (int ch = 0; ch < NUM_CHANNELS; ch++) {
-        printf("  Channel %d: %d\n", ch, channel_energy[ch]);
+        //printf("  Channel %d: %d\n", ch, channel_energy[ch]);
     }
     
-    printf("\nFirst 16 filtered samples (Channel 0):\n");
+    //printf("\nFirst 16 filtered samples (Channel 0):\n");
     for (int i = FILTER_TAPS; i < FILTER_TAPS + 16 && i < SIGNAL_LENGTH; i++) {
-        printf("%6d ", filtered_output[0][i]);
+        //printf("%6d ", filtered_output[0][i]);
     }
-    printf("\n");
+    //printf("\n");
 }
 
 int main(void) {
-    printf("========================================================\n");
-    printf("RISC-V Vector Extension: Simple FIR Filter Test\n");
-    printf("========================================================\n");
-    printf("Signal length: %d samples\n", SIGNAL_LENGTH);
-    printf("Channels: %d\n", NUM_CHANNELS);
-    printf("Filter taps: %d\n", FILTER_TAPS);
-    printf("Target: ~200-400 RVV instructions\n");
-    printf("========================================================\n\n");
+    //printf("========================================================\n");
+    //printf("RISC-V Vector Extension: Simple FIR Filter Test\n");
+    //printf("========================================================\n");
+    //printf("Signal length: %d samples\n", SIGNAL_LENGTH);
+    //printf("Channels: %d\n", NUM_CHANNELS);
+    //printf("Filter taps: %d\n", FILTER_TAPS);
+    //printf("Target: ~200-400 RVV instructions\n");
+    //printf("========================================================\n\n");
     
     init_signal();
     
@@ -308,9 +308,9 @@ int main(void) {
     
     print_results();
     
-    printf("\n========================================================\n");
-    printf("Test Completed!\n");
-    printf("========================================================\n");
+    //printf("\n========================================================\n");
+    //printf("Test Completed!\n");
+    //printf("========================================================\n");
     
     return 0;
 }

@@ -690,48 +690,46 @@ void rvv_compute_statistics(const uint8_t *image, int size,
 
 // Main processing pipeline
 int main() {
-    printf("RISC-V Vector Extension: Image Processing Pipeline Test\n");
-    printf("=========================================================\n\n");
+    //printf("RISC-V Vector Extension: Image Processing Pipeline Test\n");
+    //printf("=========================================================\n\n");
     
     // Initialize test image
-    printf("1. Initializing test image (%dx%d)...\n", IMG_WIDTH, IMG_HEIGHT);
+    //printf("1. Initializing test image (%dx%d)...\n", IMG_WIDTH, IMG_HEIGHT);
     init_test_image(input_image);
     
     // Step 1: Gaussian Blur
-    printf("2. Applying Gaussian blur (3x3 convolution)...\n");
+    //printf("2. Applying Gaussian blur (3x3 convolution)...\n");
     rvv_convolution_3x3(input_image, blurred_image, gaussian_kernel, 
                         IMG_WIDTH, IMG_HEIGHT);
     
     // Step 2: Sobel Edge Detection
-    printf("3. Computing gradients (Sobel operator)...\n");
+    //printf("3. Computing gradients (Sobel operator)...\n");
     rvv_sobel_gradients(blurred_image, gradient_x, gradient_y, gradient_mag,
                         IMG_WIDTH, IMG_HEIGHT);
     
     // Step 3: Threshold and Edge Tracking
-    printf("4. Applying threshold with hysteresis...\n");
+    //printf("4. Applying threshold with hysteresis...\n");
     uint16_t low_thresh = 50;
     uint16_t high_thresh = 150;
     rvv_threshold_hysteresis(gradient_mag, edge_image, low_thresh, high_thresh,
                              IMG_WIDTH, IMG_HEIGHT);
     
     // Step 4: Histogram Computation
-    printf("5. Computing histogram...\n");
+    //printf("5. Computing histogram...\n");
     rvv_histogram(edge_image, histogram, IMG_SIZE);
     
     // Print histogram statistics
     uint32_t edge_pixels = histogram[255];
     uint32_t non_edge_pixels = histogram[0];
-    printf("   Edge pixels: %u (%.1f%%)\n", edge_pixels, 
-           100.0f * edge_pixels / IMG_SIZE);
-    printf("   Non-edge pixels: %u (%.1f%%)\n", non_edge_pixels,
-           100.0f * non_edge_pixels / IMG_SIZE);
+    //printf("   Edge pixels: %u (%.1f%%)\n", edge_pixels, 100.0f * edge_pixels / IMG_SIZE);
+    //printf("   Non-edge pixels: %u (%.1f%%)\n", non_edge_pixels,100.0f * non_edge_pixels / IMG_SIZE);
     
     // Step 5: Normalization
-    printf("6. Normalizing edge image...\n");
+    //printf("6. Normalizing edge image...\n");
     rvv_normalize(edge_image, histogram, IMG_SIZE);
     
     // Step 6: Statistics
-    printf("7. Computing image statistics...\n");
+    //printf("7. Computing image statistics...\n");
     uint32_t sum, sum_sq;
     rvv_compute_statistics(edge_image, IMG_SIZE, &sum, &sum_sq);
     
@@ -739,34 +737,34 @@ int main() {
     float variance = (float)sum_sq / IMG_SIZE - mean * mean;
     float stddev = sqrtf(variance);
     
-    printf("   Mean: %.2f\n", mean);
-    printf("   Std Dev: %.2f\n", stddev);
+    //printf("   Mean: %.2f\n", mean);
+    //printf("   Std Dev: %.2f\n", stddev);
     
     
     // Print sample output (center 8x8 region)
-    printf("\n8. Sample output (center 8x8 region):\n");
-    printf("   ");
-    for (int x = 0; x < 8; x++) printf("  %2d", 28 + x);
-    printf("\n");
+    //printf("\n8. Sample output (center 8x8 region):\n");
+    //printf("   ");
+    for (int x = 0; x < 8; x++) //printf("  %2d", 28 + x);
+    //printf("\n");
     
     for (int y = 28; y < 36; y++) {
-        printf("   %2d", y);
+        //printf("   %2d", y);
         for (int x = 28; x < 36; x++) {
             uint8_t val = edge_image[y * IMG_WIDTH + x];
-            if (val > 200) printf("  ##");
-            else if (val > 100) printf("  ..");
-            else printf("    ");
+            //if (val > 200) //printf("  ##");
+            //else if (val > 100) //printf("  ..");
+            //else //printf("    ");
         }
-        printf("\n");
+        //printf("\n");
     }
     
-    printf("\nTest completed successfully!\n");
-    printf("Total RVV instructions executed: 150+\n");
-    printf("- Multiple vsetvl configurations\n");
-    printf("- Nested loops with vector operations\n");
-    printf("- Widening/narrowing operations\n");
-    printf("- Reductions and comparisons\n");
-    printf("- Load/store with various patterns\n");
+    //printf("\nTest completed successfully!\n");
+    //printf("Total RVV instructions executed: 150+\n");
+    //printf("- Multiple vsetvl configurations\n");
+    //printf("- Nested loops with vector operations\n");
+    //printf("- Widening/narrowing operations\n");
+    //printf("- Reductions and comparisons\n");
+    //printf("- Load/store with various patterns\n");
     
     return 0;
 }
