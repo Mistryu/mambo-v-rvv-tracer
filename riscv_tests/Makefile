@@ -33,4 +33,4 @@ clean:
 	rm -f test_rvv_reg_reg test_rvv_simple test_rvv_v0 test_rvv_v1 rvv_image_processing test_rvv_simple_filter rvv_signal_processing test_rvv_special
 
 .PHONY: all clean
-riscv64-unknown-linux-gnu-gcc -march=rv64gcv -mabi=lp64d -O2 -g mask_test.S -o mask_test
+# cc -march=rv64gcv -mabi=lp64d -O2 -g mask_test.S -o mask_test

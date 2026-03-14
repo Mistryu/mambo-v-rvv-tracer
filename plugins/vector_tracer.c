@@ -88,7 +88,7 @@ static uint8_t g_saved_rvv[RVV_SAVE_BYTES];
 #define OFF_CSR_VREGS    80  // Vector registers start
 
 static uint64_t vector_inst_count = 0;
-// static uint64_t all_inst_count = 0;
+static uint64_t all_inst_count = 0;
 
 //func3 encoding
 #define OPIVV 0b000
@@ -690,12 +690,6 @@ static void rvv_print_to_json(uint32_t inst, uintptr_t pc) {
     fprintf(json_fp, "    \"type\": %u,\n", buffer_type);
     fprintf(json_fp, "    \"number\": %lu, \n", vector_inst_count);
 
-    if (lmul_x8 >= 8) {
-        fprintf(json_fp, "    \"lmul\": %u,\n", lmul_x8 / 8);
-    } else {
-        fprintf(json_fp, "    \"lmul\": \"1/%u\",\n", 8 / lmul_x8);
-    }
-
     if (buffer_type == RVV_TYPE_REG_REG) {
         bool is_widening = is_widening_instruction(inst, vs1_rs1_imm);  
         bool is_narrowing = is_narrowing_instruction(inst, vs1_rs1_imm);
@@ -766,18 +760,10 @@ static void rvv_print_to_json(uint32_t inst, uintptr_t pc) {
             
             if (extension_factor > 1) {
                 vs2_reg_count /= extension_factor;
-                fprintf(stderr, "DEBUG: After division: vs2_reg_count=%u\n", vs2_reg_count);
             }
 
             if (vs2_reg_count < 1) vs2_reg_count = 1;
 
-                // MOVE DEBUG CALL HERE - after vs2_reg_count is fully calculated
-    // if (extension_factor > 1) {
-    //     uint64_t vl = *(const uint64_t *)(g_saved_rvv + vl_offset);
-    //     debug_extension_instruction(inst, vtype, vl, vd, vs2_rs2, 
-    //                                extension_factor, vd_reg_count, vs2_reg_count);  // ← Pass vs2_reg_count!
-    // }
-            
             print_vreg_data_json(json_fp, "vs2_data", vs2_rs2, vs2_reg_count, vregs_base, vlenb);
         }
 
@@ -849,7 +835,7 @@ static int vector_post_inst_cb(mambo_context *ctx) {
     
     if (inst_type == 0) return 0;
 
-    //emit_counter64_incr(ctx, &all_inst_count, 1);
+    emit_counter64_incr(ctx, &all_inst_count, 1);
 
     uintptr_t pc = (uintptr_t)ctx->code.read_address;
     emit_rvv_print_vtype_preserve(ctx, reg2, reg3, inst, pc, inst_type);
@@ -859,11 +845,11 @@ static int vector_post_inst_cb(mambo_context *ctx) {
     return 0;
 }
 
-// For tracing all instructions we using pre_inst callback.
-// static int all_inst_pre_cb(mambo_context *ctx) {
-//     emit_counter64_incr(ctx, &all_inst_count, 1);
-//     return 0;
-// }
+//For tracing all instructions we using pre_inst callback.
+static int all_inst_pre_cb(mambo_context *ctx) {
+    emit_counter64_incr(ctx, &all_inst_count, 1);
+    return 0;
+}
 
 __attribute__((constructor)) static void main_tracer_init(void) {
     FILE *fp = fopen("vreg_dump.txt", "w");
@@ -885,16 +871,16 @@ __attribute__((constructor)) static void main_tracer_init(void) {
     mambo_context *ctx = mambo_register_plugin();
     int set_cb = mambo_register_post_inst_cb(ctx, &vector_post_inst_cb);
     assert(set_cb == MAMBO_SUCCESS);
-    //int set_all_cb = mambo_register_pre_inst_cb(ctx, &all_inst_pre_cb);
-    //assert(set_all_cb == MAMBO_SUCCESS);
+    int set_all_cb = mambo_register_pre_inst_cb(ctx, &all_inst_pre_cb);
+    assert(set_all_cb == MAMBO_SUCCESS);
 }
 
 // Prints count at exit and finalizes JSON
 __attribute__((destructor)) static void vector_counter_fini(void) {
-    // fprintf(stderr, "[vector_counter] total vector instructions executed: %" PRIu64 "\n",
-    //         vector_inst_count);
-    // fprintf(stderr, "[vector_counter] total instructions executed: %" PRIu64 "\n",
-    //         all_inst_count);
+    fprintf(stderr, "[vector_counter] total vector instructions executed: %" PRIu64 "\n",
+            vector_inst_count);
+    fprintf(stderr, "[vector_counter] total instructions executed: %" PRIu64 "\n",
+            all_inst_count);
     
     if (json_fp != NULL) {
         fprintf(json_fp, "]\n");

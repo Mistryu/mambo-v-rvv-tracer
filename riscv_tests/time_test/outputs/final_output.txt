@@ -1,0 +1,91 @@
+--- Native ---
+Program                   Description            Time (s)
+------------------------------------------------------------
+test_rvv_simple           Simple test               0.003
+rvv_simple_filter         Basic loop                0.003
+rvv_image_processing      Larger program            0.003
+rvv_signal_processing     Very large program        0.006
+------------------------------------------------------------
+
+--- DBM ---
+Program                   Description            Time (s)
+------------------------------------------------------------
+test_rvv_simple           Simple test               0.070
+rvv_simple_filter         Basic loop                0.079
+rvv_image_processing      Larger program            1.171
+rvv_signal_processing     Very large program        3.063
+------------------------------------------------------------
+
+--- GDB API Tracer ---
+Program                   Description            Time (s)
+------------------------------------------------------------
+test_rvv_simple           Simple test               1.077
+rvv_simple_filter         Basic loop                9.934
+rvv_image_processing      Larger program         2097.745
+rvv_signal_processing     Very large program     5793.177
+------------------------------------------------------------
+
+--- GDB Basic Tracer ---
+Program                   Description            Time (s)
+------------------------------------------------------------
+test_rvv_simple           Simple test               7.401
+rvv_simple_filter         Basic loop               14.264
+rvv_image_processing      Larger program         5348.073
+rvv_signal_processing     Very large program      SKIPPED
+------------------------------------------------------------
+
+
+
+ -----    Main comparison    -----
+Program                   Description            Native (s)    DBM (s)   GDB Basic (s)   DBM/Native Basic/Native    Basic/DBM
+----------------------------------------------------------------------------------------------------
+test_rvv_simple           Simple test                 0.003      0.070           7.401       27.10x     2877.33x    106.19x
+rvv_simple_filter         Basic loop                  0.003      0.079          14.264       30.73x     5527.65x    179.89x
+rvv_image_processing      Larger program              0.003      1.171        5348.073      371.21x  1696007.24x   4568.81x
+rvv_signal_processing     Very large program          0.006      3.063          -1.000      473.82x     -154.68x     -0.33x
+
+
+
+
+Program                   Description            Native (s)    DBM (s)  GDB Tracer API (s)   DBM/Native   API/Native    API/DBM 
+----------------------------------------------------------------------------------------------------
+test_rvv_simple           Simple test                 0.003      0.070           1.077       27.10x      418.57x     15.45x
+rvv_simple_filter         Basic loop                  0.003      0.079           9.934       30.73x     3849.91x    125.29x
+rvv_image_processing      Larger program              0.003      1.171        2097.745      371.21x   665247.07x   1792.08x
+rvv_signal_processing     Very large program          0.006      3.063        5793.177      473.82x   896110.81x   1891.24x
+
+
+
+ --- GDB Basic vs GDB API ---
+Program                   Description          GDB Basic (s) GDB Tracer API (s)      GDB/API
+----------------------------------------------------------------------------------------------------
+test_rvv_simple           Simple test                 7.401           1.077        6.87x 
+rvv_simple_filter         Basic loop                 14.264           9.934        1.44x 
+rvv_image_processing      Larger program           5348.073        2097.745        2.55x 
+rvv_signal_processing     Very large program         -1.000        5793.177       -0.00x 
+----------------------------------------------------------------------------------------------------
+
+
+Instruction count:
+
+test_rvv_simple:
+[vector_counter] total vector instructions executed: 10
+[vector_counter] total instructions executed: 124109
+instruction ratio approximately 1 : 12410   or 0.008%  of total program
+
+rvv_simple_filter:
+[vector_counter] total vector instructions executed: 236
+[vector_counter] total instructions executed: 125631
+instruction ratio approximately 1 : 532   or 0.188%  of total program
+
+
+rvv_image_processing:
+[vector_counter] total vector instructions executed: 32 584
+[vector_counter] total instructions executed: 353 883
+instruction ratio approximately 1 : 11    or 9.208% of total program
+32584 : 353883 = 0.09207562951
+
+rvv_signal_processing:
+[vector_counter] total vector instructions executed: 72079
+[vector_counter] total instructions executed: 3 850 477
+instruction ratio approximately 1 : 53    or 1.872% of total program
