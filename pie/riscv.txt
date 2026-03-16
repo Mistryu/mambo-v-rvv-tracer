@@ -26,6 +26,10 @@
 #   * NSE  to indicate that the opcode is reserved for custom extensions
 #   * HINT to indicate that the opcode is reserved for microarchitectural hints.
 #
+
+#This file has been modified by the author of the RVV tracer
+
+
 #
 # RVC Standard Extension for Compressed Instructions -- RVC 2.0 Ratified
 # Instruction listing for RVC, Quadrant 0

@@ -18,6 +18,10 @@
   limitations under the License.
 */
 
+/*
+This file has been modified by the author of the RVV tracer
+*/
+
 #ifdef __riscv
 
 #include <assert.h>
