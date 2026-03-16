@@ -4,11 +4,5 @@ api/emit_*.h
 elf/elf_loader.o
 elf/symbol_parser.o
 .vscode/
-output.txt
-vector_trace.json
-vreg_dump.txt
 /temp
-py_graph/venv/
-riscv-vspec-1.0.pdf
-py_graph
 *.json
