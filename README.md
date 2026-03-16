@@ -4,7 +4,7 @@ This repository is a fork of **MAMBO-V** (itself based on MAMBO), adapted for RV
 
 ## What this fork is
 
-`mambo-thesis` keeps the core dynamic binary modification/runtime translation model from MAMBO, and adds RVV-oriented plugin to make vector instruction behavior easier to inspect and debug.
+`mambo-v-rvv-tracer` keeps the core dynamic binary modification/runtime translation model from MAMBO, and adds RVV-oriented plugin to make vector instruction behavior easier to inspect and debug.
 
 ## How it works
 
