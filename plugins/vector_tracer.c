@@ -33,7 +33,6 @@
 #define RVV_SUMOP_WHOLE 0x08u
 #endif
 
-//TODO remove unecessary entries
 // Buffer layout for g_saved_rvv
 #define RVV_VREG_BYTES      256u      // Max bytes per vector register
 #define RVV_NUM_VREGS       32u        // Total vector registers
@@ -596,34 +595,6 @@ static inline void print_vreg_data_json(FILE *fp,
 static FILE *json_fp = NULL;
 static bool json_first_entry = true;
 
-/* TODO: problmatic instructions:
-
-    Logic grouping: // Done
-    1. vmv.s.x vd, rs1
-
-    // vmv.s.x vd, rs1
-    // vfmv.s.f vd, rs1 
-
-    // Done VRFUNARY0 && VWXUNARY0
-    2.  vmv.x.s rd, vs2
-    // vmv.x.s rd, vs2
-    // vfmv.f.s rd, vs2
-    // vcpop.m rd, vs2, vm
-    // vfirst.m rd, vs2, vm
-
-    3. Done VMUNARY0 encoding space vid also prints vs2 which should be v0
-    viota.m vd, vs2, vm
-    vid.v vd, vm
-    vmsbf.m vd, vs2, vm
-
-    4. vmv<nr>r cd, vs1 Done
-
-    5.     Vector Compress vcompress.vm vd, vs2, vs1, vm
-    Most likely has to be changed in the UI 
-*/
-
-
-
 // Prints a single instruction entry to JSON file
 static void rvv_print_to_json(uint32_t inst, uintptr_t pc) {
 
@@ -788,7 +759,6 @@ static void rvv_print_to_json(uint32_t inst, uintptr_t pc) {
 
         } else if ((mop == 0b01) || (mop == 0b11)) { // Indexed
 
-            //TODO ask how does it work exactly and wheather I have to trace more then 1 vs2 register page 38
             fprintf(json_fp, "    \"vs2\": %u,\n", vs2_rs2);
             
             char vreg_hex[RVV_VREG_BYTES * 2 + 1];

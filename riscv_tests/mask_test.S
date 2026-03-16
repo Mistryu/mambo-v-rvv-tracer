@@ -5,9 +5,10 @@ b:
     .word 10,10,10,10,10,10,10,10
 
 .section .text
-.global main
+.global mask_test
+.type mask_test, @function
 
-main:
+mask_test:
 
     li t0,8
 

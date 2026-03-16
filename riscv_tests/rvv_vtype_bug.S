@@ -1,6 +1,8 @@
 .section .text
-.globl main
-main:
+.global rvv_vtype_bug
+.type rvv_vtype_bug, @function
+
+rvv_vtype_bug:
    
     li         t0, 8
     vsetvli    zero, t0, e32, m1, ta, ma

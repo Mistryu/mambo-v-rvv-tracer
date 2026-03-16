@@ -9,8 +9,10 @@
 
 
 .section .text
-.globl main
-main:
+.global ternary_incorrect
+.type ternary_incorrect, @function
+
+ternary_incorrect:
     la      a0, A
     la      a1, B
     la      a2, W
@@ -39,7 +41,6 @@ main:
 
     vmv.v.i   v8, 0
     vredsum.vs v8, v1, v8  # Error 
-    vmv.x.s   a0, v8          # return value in a0
     ret
 
 .section .data
