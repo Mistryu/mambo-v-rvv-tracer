@@ -36,10 +36,10 @@ ternary_incorrect:
     vmsgt.vx  v0, v5, t0
 
     # v7 = (v5 > 100) ? v5 : 0
-    vmv.v.i   v6, 0
+    vmv.v.i   v6, 0 # Clear v6 to use as the false value
     vmerge.vvm v7, v6, v5, v0
 
-    vmv.v.i   v8, 0
+    vmv.v.i   v8, 0 # Clear v8 to accumulate the sum of outputs
     vredsum.vs v8, v1, v8  # Error 
     ret
 

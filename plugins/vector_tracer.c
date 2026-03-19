@@ -803,6 +803,7 @@ static int vector_post_inst_cb(mambo_context *ctx) {
     uint32_t inst = *(uint32_t *)ctx->code.read_address;
     int inst_type = rvv_classify_instruction(inst);
     
+    
     if (inst_type == 0) return 0;
 
     emit_counter64_incr(ctx, &all_inst_count, 1);

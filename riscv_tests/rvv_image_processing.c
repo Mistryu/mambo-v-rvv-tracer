@@ -1,26 +1,3 @@
-/*
- * RISC-V Vector Extension Test: Image Processing Pipeline
- * 
- * This program simulates a real-world image processing workload:
- * 1. Load image data (grayscale)
- * 2. Apply Gaussian blur (3x3 convolution)
- * 3. Compute gradients (Sobel operator)
- * 4. Apply threshold for edge detection
- * 5. Histogram calculation
- * 6. Normalization
- * 
- * Tests multiple RVV features:
- * - Multiple vsetvl configurations (different SEW, LMUL)
- * - Load/Store operations (unit-stride, strided)
- * - Arithmetic operations (add, mul, shift)
- * - Comparison and masking
- * - Reductions
- * - Widening operations
- * - Multiple nested loops
- * 
- * Total RVV instructions: 150+
- */
-
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>

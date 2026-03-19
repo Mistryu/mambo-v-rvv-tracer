@@ -1,20 +1,3 @@
-/*
- * RISC-V Vector Extension Test: Simple FIR Filter
- * 
- * This program implements a basic FIR filtering operation:
- * Loop 1: Apply FIR filter to input signal
- * Loop 2: Compute energy and normalize output
- * 
- * Features tested:
- * - Multiple vsetvli configurations (e16/m2, e32/m4)
- * - Vector arithmetic (multiply-accumulate, add, shift)
- * - Vector memory operations (load/store)
- * - Vector reductions
- * - Widening operations
- * 
- * Target: ~200-400 RVV instructions
- */
-
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
@@ -36,7 +19,6 @@ int32_t channel_energy[NUM_CHANNELS];
 
 // Initialize test signal
 void init_signal(void) {
-    //printf("Initializing signal...\n");
     
     for (int ch = 0; ch < NUM_CHANNELS; ch++) {
         for (int i = 0; i < SIGNAL_LENGTH; i++) {
@@ -46,17 +28,9 @@ void init_signal(void) {
     }
 }
 
-/*
- * LOOP 1: FIR Filtering
- * 
- * Apply FIR filter to each channel using RVV instructions.
- * Uses vsetvli with e16/m2 and e32/m4 configurations.
- */
 void rvv_fir_filter(void) {
-    //printf("\n=== LOOP 1: FIR Filtering ===\n");
     
     for (int ch = 0; ch < NUM_CHANNELS; ch++) {
-        //printf("Processing channel %d/%d...\n", ch + 1, NUM_CHANNELS);
         
         const int16_t *input = input_signal[ch];
         int16_t *output = filtered_output[ch];
@@ -137,18 +111,10 @@ void rvv_fir_filter(void) {
     //printf("Filtering completed.\n");
 }
 
-/*
- * LOOP 2: Energy Computation and Normalization
- * 
- * Compute energy per channel and normalize the output.
- * Uses vsetvli with e16/m2 and e32/m4 configurations.
- */
 void rvv_energy_normalize(void) {
-    //printf("\n=== LOOP 2: Energy and Normalization ===\n");
     
     // Compute energy for each channel
     for (int ch = 0; ch < NUM_CHANNELS; ch++) {
-        //printf("Computing energy for channel %d/%d...\n", ch + 1, NUM_CHANNELS);
         
         int16_t *signal = filtered_output[ch];
         int64_t energy = 0;
@@ -212,7 +178,6 @@ void rvv_energy_normalize(void) {
     if (max_energy == 0) max_energy = 1;
     
     // Normalize all channels
-    //printf("Normalizing channels...\n");
     for (int ch = 0; ch < NUM_CHANNELS; ch++) {
         int16_t *signal = filtered_output[ch];
         int32_t scale = (32767 * 1024) / max_energy;
@@ -269,35 +234,26 @@ void rvv_energy_normalize(void) {
         }
     }
     
-    //printf("Energy and normalization completed.\n");
 }
 
 // Print results
 void print_results(void) {
-    //printf("\n=== Results ===\n");
+    printf("\n=== Results ===\n");
     
-    //printf("Channel Energies:\n");
+    printf("Channel Energies:\n");
     for (int ch = 0; ch < NUM_CHANNELS; ch++) {
-        //printf("  Channel %d: %d\n", ch, channel_energy[ch]);
+        printf("  Channel %d: %d\n", ch, channel_energy[ch]);
     }
     
-    //printf("\nFirst 16 filtered samples (Channel 0):\n");
+    printf("\nFirst 16 filtered samples (Channel 0):\n");
     for (int i = FILTER_TAPS; i < FILTER_TAPS + 16 && i < SIGNAL_LENGTH; i++) {
-        //printf("%6d ", filtered_output[0][i]);
+        printf("%6d ", filtered_output[0][i]);
     }
-    //printf("\n");
+    printf("\n");
 }
 
 int main(void) {
-    //printf("========================================================\n");
-    //printf("RISC-V Vector Extension: Simple FIR Filter Test\n");
-    //printf("========================================================\n");
-    //printf("Signal length: %d samples\n", SIGNAL_LENGTH);
-    //printf("Channels: %d\n", NUM_CHANNELS);
-    //printf("Filter taps: %d\n", FILTER_TAPS);
-    //printf("Target: ~200-400 RVV instructions\n");
-    //printf("========================================================\n\n");
-    
+
     init_signal();
     
     // LOOP 1: FIR filtering
@@ -307,10 +263,6 @@ int main(void) {
     rvv_energy_normalize();
     
     print_results();
-    
-    //printf("\n========================================================\n");
-    //printf("Test Completed!\n");
-    //printf("========================================================\n");
     
     return 0;
 }

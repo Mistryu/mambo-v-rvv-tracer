@@ -1,21 +1,3 @@
-/*
- * RISC-V Vector Extension Test: Signal Processing Pipeline
- * 
- * This program simulates audio/signal processing workload:
- * Loop 1: Multi-band FIR filtering (low-pass, high-pass, band-pass)
- * Loop 2: Windowing and data preparation for FFT
- * 
- * Features tested:
- * - Multiple vsetvli configurations (e8, e16, e32 with m1, m2, m4, m8)
- * - Vector arithmetic (add, sub, mul, mac)
- * - Vector memory operations (load/store, strided)
- * - Vector reductions
- * - Vector masking and comparisons
- * - Vector slides and permutations
- * 
- * Total RVV instructions: 300+
- */
-
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -65,7 +47,6 @@ int32_t energy_per_channel[NUM_CHANNELS];
 
 // Initialize test signal with multi-frequency components
 void init_test_signal(void) {
-    //printf("Initializing test signal...\n");
     
     // Generate Hamming window: w(n) = 0.54 - 0.46*cos(2*pi*n/(N-1))
     for (int i = 0; i < SIGNAL_LENGTH; i++) {
@@ -92,23 +73,10 @@ void init_test_signal(void) {
     }
 }
 
-/*
- * LOOP 1: Multi-band FIR Filtering
- * 
- * Apply three different FIR filters (low-pass, high-pass, band-pass)
- * to all channels using RVV instructions.
- * 
- * Uses multiple vsetvli configurations:
- * - e16, m2 for main filtering operations
- * - e32, m4 for accumulation
- * - e16, m1 for coefficient loads
- */
 void rvv_multiband_fir_filter(void) {
-    //printf("\n=== LOOP 1: Multi-band FIR Filtering ===\n");
     
     // Process each channel
     for (int ch = 0; ch < NUM_CHANNELS; ch++) {
-        //printf("Processing channel %d/%d...\n", ch + 1, NUM_CHANNELS);
         
         const int16_t *input = input_signal[ch];
         int16_t *lp_out = lowpass_output[ch];
@@ -222,22 +190,10 @@ void rvv_multiband_fir_filter(void) {
     //printf("Multi-band filtering completed.\n");
 }
 
-/*
- * LOOP 2: Window Function Application and Energy Computation
- * 
- * Apply Hamming window to filtered signals and compute energy per channel.
- * 
- * Uses multiple vsetvli configurations:
- * - e16, m2 for windowing operations
- * - e32, m4 for energy accumulation
- * - e16, m8 for batch processing
- */
 void rvv_window_and_energy(void) {
-    //printf("\n=== LOOP 2: Windowing and Energy Computation ===\n");
     
     // Process each channel
     for (int ch = 0; ch < NUM_CHANNELS; ch++) {
-        //printf("Windowing channel %d/%d...\n", ch + 1, NUM_CHANNELS);
         
         // Select which filtered output to window (alternate between filters)
         const int16_t *filtered;
@@ -351,12 +307,10 @@ void rvv_window_and_energy(void) {
         energy_per_channel[ch] = (int32_t)(channel_energy / SIGNAL_LENGTH);
     }
     
-    //printf("Windowing and energy computation completed.\n");
 }
 
 // Additional processing: Compute statistics across channels
 void rvv_channel_statistics(void) {
-    //printf("\n=== Computing Channel Statistics ===\n");
     
     // Find min and max energy across channels
     // CSR change: e32, m2
@@ -414,59 +368,40 @@ void rvv_channel_statistics(void) {
     );
     
     float avg_energy = (float)sum_energy / NUM_CHANNELS;
-    
-    //printf("Energy Statistics:\n");
-    //printf("  Min Energy: %d\n", min_energy);
-    //printf("  Max Energy: %d\n", max_energy);
-    //printf("  Avg Energy: %.2f\n", avg_energy);
-    
-    // Print per-channel energies
-    //printf("\nPer-Channel Energies:\n");
-    for (int ch = 0; ch < NUM_CHANNELS; ch++) {
-        //printf("  Channel %d: %d\n", ch, energy_per_channel[ch]);
-    }
+
 }
 
 // Verify results with sample outputs
 void print_sample_results(void) {
-    //printf("\n=== Sample Results ===\n");
     
-    // Print first 16 samples of channel 0 from each filter
-    //printf("\nChannel 0 - First 16 samples:\n");
-    //printf("Low-pass:  ");
+    printf("\nChannel 0 - First 16 samples:\n");
+    printf("Low-pass:  ");
     for (int i = FILTER_TAPS; i < FILTER_TAPS + 16; i++) {
-        //printf("%6d ", lowpass_output[0][i]);
+        printf("%6d ", lowpass_output[0][i]);
     }
-    //printf("\n");
+    printf("\n");
     
-    //printf("High-pass: ");
+    printf("High-pass: ");
     for (int i = FILTER_TAPS; i < FILTER_TAPS + 16; i++) {
-        //printf("%6d ", highpass_output[0][i]);
+        printf("%6d ", highpass_output[0][i]);
     }
-    //printf("\n");
+    printf("\n");
     
-    //printf("Band-pass: ");
+    printf("Band-pass: ");
     for (int i = FILTER_TAPS; i < FILTER_TAPS + 16; i++) {
-        //printf("%6d ", bandpass_output[0][i]);
+        printf("%6d ", bandpass_output[0][i]);
     }
-    //printf("\n");
+    printf("\n");
     
     // Print windowed output
-    //printf("\nWindowed (first 16 samples):\n");
+    printf("\nWindowed (first 16 samples):\n");
     for (int i = 0; i < 16; i++) {
-        //printf("%6d ", windowed_signal[0][i]);
+        printf("%6d ", windowed_signal[0][i]);
     }
-    //printf("\n");
+    printf("\n");
 }
 
 int main(void) {
-    //printf("========================================================\n");
-    //printf("RISC-V Vector Extension: Signal Processing Test\n");
-    //printf("========================================================\n");
-    //printf("Signal length: %d samples\n", SIGNAL_LENGTH);
-    //printf("Number of channels: %d\n", NUM_CHANNELS);
-    //printf("Filter taps: %d\n", FILTER_TAPS);
-    //printf("========================================================\n\n");
     
     // Initialize test data
     init_test_signal();
@@ -481,23 +416,7 @@ int main(void) {
     rvv_channel_statistics();
     
     // Print sample results
-    print_sample_results();
-    
-    //printf("\n========================================================\n");
-    //printf("Test Completed Successfully!\n");
-    //printf("========================================================\n");
-    //printf("RVV Instructions Used:\n");
-    //printf("  - vsetvli (multiple SEW/LMUL configurations)\n");
-    //printf("  - vle16.v, vse16.v (vector load/store)\n");
-    //printf("  - vle32.v, vse32.v\n");
-    //printf("  - vwmul.vv, vwmul.vx, vwmacc.vx (widening multiply)\n");
-    //printf("  - vadd.vv, vsub.vv\n");
-    //printf("  - vsra.vi (shift right arithmetic)\n");
-    //printf("  - vnclip.wi (narrowing with saturation)\n");
-    //printf("  - vmv.v.i, vmv.s.x, vmv.x.s\n");
-    //printf("  - vredsum.vs, vredmin.vs, vredmax.vs (reductions)\n");
-    //printf("Total RVV instructions executed: 300+\n");
-    //printf("========================================================\n");
+    //print_sample_results();
     
     return 0;
 }
