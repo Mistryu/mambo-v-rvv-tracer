@@ -89,3 +89,14 @@ rvv_signal_processing:
 [vector_counter] total vector instructions executed: 72079
 [vector_counter] total instructions executed: 3 850 477
 instruction ratio approximately 1 : 53    or 1.872% of total program
+
+Vector counter results:
+
+--- DBM ---
+Program                   Description            Time (s)
+------------------------------------------------------------
+test_rvv_simple           Simple test               0.055
+rvv_simple_filter         Basic loop                0.056
+rvv_image_processing      Larger program            0.059
+rvv_signal_processing     Very large program        0.065
+------------------------------------------------------------

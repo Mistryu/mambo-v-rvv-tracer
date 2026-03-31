@@ -224,6 +224,7 @@ def run_dbm(prog):
     elapsed = time.perf_counter() - start
     return elapsed
 
+
 def p(s=""):
     out.write(s + "\n")
     out.flush()
